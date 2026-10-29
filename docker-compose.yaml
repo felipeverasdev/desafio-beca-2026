@@ -1,0 +1,57 @@
+services:
+
+  # User database
+  user-db:
+    image: postgres:16-alpine
+    container_name: ms-user-db
+    restart: always
+    environment:
+      POSTGRES_DB: user_db
+      POSTGRES_USER: ${USER_DB_USER}
+      POSTGRES_PASSWORD: ${USER_DB_PASS}
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+    networks:
+      - beca-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U user_admin -d user_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Transaction db
+  transaction-db:
+    image: postgres:16-alpine
+    container_name: ms-transaction-db
+    restart: always
+    environment:
+      POSTGRES_DB: transaction_db
+      POSTGRES_USER: ${TRANSACTION_DB_USER}
+      POSTGRES_PASSWORD: ${TRANSACTION_DB_PASS}
+    ports:
+      - "5433:5432"
+    volumes:
+      - transaction_db_data:/var/lib/postgresql/data
+    networks:
+      - beca-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U transaction_admin -d transaction_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# Volumes to prevent data loss when restarting container
+volumes:
+  user_db_data:
+    driver: local
+  transaction_db_data:
+    driver: local
+
+# Shared networks for internal communications
+networks:
+  beca-network:
+    driver: bridge
+
