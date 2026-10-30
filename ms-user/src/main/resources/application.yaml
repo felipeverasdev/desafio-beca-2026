@@ -1,3 +1,15 @@
 spring:
+  datasource:
+    url: jdbc:postgresql://local:5432/user_db
+    username: ${USER_DB_USER}
+    password: ${USER_DB_PASS}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+      show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
   application:
     name: ms-user
