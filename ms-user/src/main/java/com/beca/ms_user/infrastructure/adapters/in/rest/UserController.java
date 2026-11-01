@@ -78,7 +78,7 @@ public class UserController {
     @Operation(summary = "Remover usuário por identificador (ID)")
     @ApiResponse(responseCode = "204", description = "Usuário removido com sucesso")
     @DeleteMapping("/{id}")
-    public ResponseEntity<void> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
         deleteUserUseCase.delete(id);
 
         return ResponseEntity.noContent().build();

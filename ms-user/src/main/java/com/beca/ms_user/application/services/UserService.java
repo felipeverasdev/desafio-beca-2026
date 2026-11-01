@@ -29,7 +29,7 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
                     throw new IllegalArgumentException("CPF já cadastrado no sistema.");
                 });
 
-        return userRepositoryPort.save(User user);
+        return userRepositoryPort.save(user);
     }
 
     @Override

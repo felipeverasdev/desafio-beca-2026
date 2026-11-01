@@ -3,7 +3,7 @@ package com.beca.ms_user.infrastructure.adapters.in.rest.exception;
 import java.io.Serializable;
 import java.time.Instant;
 
-public class StandardError extends Serializable {
+public class StandardError implements Serializable {
     private static final Long serialVersionUID = 1L;
 
     private Instant timeStamp;

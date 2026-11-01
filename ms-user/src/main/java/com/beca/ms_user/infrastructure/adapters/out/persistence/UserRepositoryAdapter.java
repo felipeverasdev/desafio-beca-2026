@@ -32,12 +32,12 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
     }
 
     @Override
-    public User findByEmail(String email) {
+    public Optional<User> findByEmail(String email) {
         return repository.findByEmail(email).map(this::toDomain);
     }
 
     @Override
-    public User findByCpf(String cpf) {
+    public Optional<User> findByCpf(String cpf) {
         return repository.findByCpf(cpf).map(this::toDomain);
     }
 
