@@ -6,6 +6,8 @@ import com.beca.ms_user.application.ports.in.FindUserUseCase;
 import com.beca.ms_user.application.ports.in.UpdateUserUseCase;
 import com.beca.ms_user.domain.models.User;
 import com.beca.ms_user.infrastructure.adapters.in.rest.dto.UserRequestDTO;
+import com.beca.ms_user.infrastructure.adapters.in.rest.dto.UserResponseDTO;
+import com.beca.ms_user.infrastructure.adapters.in.rest.dto.UserSummaryDTO;
 import com.beca.ms_user.infrastructure.adapters.in.rest.dto.UserUpdateDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -43,16 +45,29 @@ public class UserController {
             @ApiResponse(responseCode = "400", description = "Dados inválidos ou e-mails/CPFs/telefones duplicados")
     })
     @PostMapping
-    public ResponseEntity<User> create(@RequestBody @Valid UserRequestDTO dto) {
-        User userDomain = new User(null, dto.name(), dto.email(), dto.cpf(), dto.phone());
+    public ResponseEntity<UserResponseDTO> create(@RequestBody @Valid UserRequestDTO dto) {
+        User userDomain = new User(null, dto.name(), dto.email(), dto.cpf(), dto.phone(),  );
         User created = createUserUseCase.execute(userDomain);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+
+        UserResponseDTO response = new UserResponseDTO(created.getId(), created.getName(),
+                created.getEmail(), created.getCpf(), created.getPhone(),
+                created.getCreatedAt(), created.getUpdatedAt());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @Operation(summary = "Listar todos os usuários cadastrados")
     @GetMapping
-    public ResponseEntity<List<User>> findAll() {
-        return ResponseEntity.ok(findUserUseCase.findAll());
+    public ResponseEntity<List<UserSummaryDTO>> findAll() {
+        List<User> usersDomain = findUserUseCase.findAll();
+
+        List<UserSummaryDTO> response = usersDomain.stream()
+                .map(user -> new UserSummaryDTO(
+                        user.getId(),
+                        user.getName(),
+                        user.getEmail()
+                )).toList();
+
+        return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Buscar usuário por identificador (ID)")
@@ -61,27 +76,48 @@ public class UserController {
             @ApiResponse(responseCode = "404", description = "Usuário não localizado no sistema")
     })
     @GetMapping("/{id}")
-    public ResponseEntity<User> findById(@PathVariable UUID id) {
-        return ResponseEntity.ok(findUserUseCase.findById(id));
+    public ResponseEntity<UserResponseDTO> findById(@PathVariable UUID id) {
+        User user = findUserUseCase.findById(id);
+
+        UserResponseDTO response = new UserResponseDTO(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getCpf(),
+                user.getPhone(),
+                user.getCreatedAt(),
+                user.getUpdatedAt()
+        );
+
+        return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Atualizar dados de um usuário existente")
     @PutMapping("/{id}")
-    public ResponseEntity<User> update(@PathVariable UUID id,
+    public ResponseEntity<UserResponseDTO> update(@PathVariable UUID id,
                                        @RequestBody @Valid UserUpdateDTO dto) {
-        User updated = new User(id, dto.name(), dto.email(), null, dto.phone());
-
+        User updated = User.prepareUpdate(id, dto.name(), dto.phone());
         User saved = updateUserUseCase.update(id, updated);
 
-        return ResponseEntity.ok(saved);
+        UserResponseDTO response = new UserResponseDTO(
+                saved.getId(),
+                saved.getName(),
+                saved.getEmail(),
+                saved.getCpf(),
+                saved.getPhone(),
+                saved.getCreatedAt(),
+                saved.getUpdatedAt()
+        );
+
+        return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "Remover usuário por identificador (ID)")
+    @Operation(summary = "Remover usuário por identificador (ID)",
+    description = "Deve desativar o usuário, mas manter os seus dados no banco de dados.")
     @ApiResponse(responseCode = "204", description = "Usuário removido com sucesso")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         deleteUserUseCase.delete(id);
-
         return ResponseEntity.noContent().build();
     }
 }

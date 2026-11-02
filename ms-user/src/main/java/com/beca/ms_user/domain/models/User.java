@@ -37,10 +37,6 @@ public class User {
         return name;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
     public String getEmail() {
         return email;
     }
@@ -53,10 +49,6 @@ public class User {
         return phone;
     }
 
-    public void setPhone(String phone) {
-        this.phone = phone;
-    }
-
     public OffsetDateTime getCreatedAt() {
         return createdAt;
     }
@@ -67,5 +59,20 @@ public class User {
 
     public OffsetDateTime getDeletedAt() {
         return deletedAt;
+    }
+
+    public void updatePersonalData(String newName, String newPhone) {
+        this.name = newName;
+        this.phone = newPhone;
+        this.updatedAt = OffsetDateTime.now();
+    }
+
+    public static  User prepareUpdate(UUID id, String name, String phone) {
+        return new User(id, name, null, null, phone, null, null, null);
+    }
+
+    public void delete() {
+        this.deletedAt = OffsetDateTime.now();
+        this.updatedAt = OffsetDateTime.now();
     }
 }

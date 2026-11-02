@@ -29,22 +29,22 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
 
     @Override
     public Optional<User> findById(UUID id) {
-        return repository.findById(id).map(this::toDomain);
+        return repository.findByIdAndDeletedAtIsNull(id).map(this::toDomain);
     }
 
     @Override
     public Optional<User> findByEmail(String email) {
-        return repository.findByEmail(email).map(this::toDomain);
+        return repository.findByEmailAndDeletedAtIsNull(email).map(this::toDomain);
     }
 
     @Override
     public Optional<User> findByCpf(String cpf) {
-        return repository.findByCpf(cpf).map(this::toDomain);
+        return repository.findByCpfAndDeletedAtIsNull(cpf).map(this::toDomain);
     }
 
     @Override
     public List<User> findAll() {
-        return repository.findAll().stream().map(this::toDomain).collect(Collectors.toList());
+        return repository.findAllByDeletedIsNull().stream().map(this::toDomain).collect(Collectors.toList());
     }
 
     @Override

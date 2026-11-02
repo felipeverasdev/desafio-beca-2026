@@ -47,24 +47,19 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
     @Override
     public User update(UUID id, User updatedUsr) {
         User currentUser = findById(id);
-        userRepositoryPort.findByEmail(updatedUsr.getEmail())
-                .ifPresent(u -> {
-                    if(!u.getId().equals(id)) {
-                        throw new IllegalArgumentException("E-mail já cadastrado na base de dados.");
-                    }
-                });
 
-        currentUser.setName(updatedUsr.getName());
-        currentUser.setEmail(updatedUsr.getEmail());
-        currentUser.setPhone(updatedUsr.getPhone());
+        currentUser.updatePersonalData(updatedUsr.getName(), updatedUsr.getPhone());
 
         return userRepositoryPort.save(currentUser);
     }
 
     @Override
     public void delete(UUID id) {
-        findById(id);
+        User user = findById(id);
 
-        userRepositoryPort.deleteById(id);
+        user.delete();
+
+        userRepositoryPort.save(user);
     }
+
 }
