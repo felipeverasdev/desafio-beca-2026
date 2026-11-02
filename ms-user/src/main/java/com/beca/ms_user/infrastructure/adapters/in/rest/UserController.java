@@ -17,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @Tag(name = "Users",
         description = "Endpoints para gerenciamento do ciclo de vida de usuários")
@@ -60,13 +61,13 @@ public class UserController {
             @ApiResponse(responseCode = "404", description = "Usuário não localizado no sistema")
     })
     @GetMapping("/{id}")
-    public ResponseEntity<User> findById(@PathVariable Long id) {
+    public ResponseEntity<User> findById(@PathVariable UUID id) {
         return ResponseEntity.ok(findUserUseCase.findById(id));
     }
 
     @Operation(summary = "Atualizar dados de um usuário existente")
     @PutMapping("/{id}")
-    public ResponseEntity<User> update(@PathVariable Long id,
+    public ResponseEntity<User> update(@PathVariable UUID id,
                                        @RequestBody @Valid UserUpdateDTO dto) {
         User updated = new User(id, dto.name(), dto.email(), null, dto.phone());
 
@@ -78,7 +79,7 @@ public class UserController {
     @Operation(summary = "Remover usuário por identificador (ID)")
     @ApiResponse(responseCode = "204", description = "Usuário removido com sucesso")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
         deleteUserUseCase.delete(id);
 
         return ResponseEntity.noContent().build();

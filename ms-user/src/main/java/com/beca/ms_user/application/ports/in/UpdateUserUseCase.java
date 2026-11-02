@@ -2,6 +2,8 @@ package com.beca.ms_user.application.ports.in;
 
 import com.beca.ms_user.domain.models.User;
 
+import java.util.UUID;
+
 public interface UpdateUserUseCase {
-    User update(Long id, User user);
+    User update(UUID id, User user);
 }

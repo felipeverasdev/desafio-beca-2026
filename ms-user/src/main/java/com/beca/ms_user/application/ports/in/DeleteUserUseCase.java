@@ -1,5 +1,7 @@
 package com.beca.ms_user.application.ports.in;
 
+import java.util.UUID;
+
 public interface DeleteUserUseCase {
-    void delete(Long id);
+    void delete(UUID id);
 }

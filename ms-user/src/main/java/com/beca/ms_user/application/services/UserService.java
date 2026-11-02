@@ -9,6 +9,7 @@ import com.beca.ms_user.domain.exceptions.UserNotFoundException;
 import com.beca.ms_user.domain.models.User;
 
 import java.util.List;
+import java.util.UUID;
 
 public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUserUseCase, DeleteUserUseCase {
     private final UserRepositoryPort userRepositoryPort;
@@ -33,7 +34,7 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
     }
 
     @Override
-    public User findById(Long id) {
+    public User findById(UUID id) {
         return userRepositoryPort.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("Usuário não encontrado. ID: " + id));
     }
@@ -44,7 +45,7 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
     }
 
     @Override
-    public User update(Long id, User updatedUsr) {
+    public User update(UUID id, User updatedUsr) {
         User currentUser = findById(id);
         userRepositoryPort.findByEmail(updatedUsr.getEmail())
                 .ifPresent(u -> {
@@ -61,7 +62,7 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
     }
 
     @Override
-    public void delete(Long id) {
+    public void delete(UUID id) {
         findById(id);
 
         userRepositoryPort.deleteById(id);
