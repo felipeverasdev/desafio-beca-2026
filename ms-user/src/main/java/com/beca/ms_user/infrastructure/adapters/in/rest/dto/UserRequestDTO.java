@@ -17,7 +17,8 @@ public record UserRequestDTO(
         String cpf,
 
         @NotBlank(message = "O número de celular é obrigatório")
-        @Pattern(regexp = "\\d{13}", message = "Formato de número de celular inválido")
+        @Pattern(regexp = "^[1-9]{2}[1-9]{2}9[0-9]{8}$",
+                message = "Formato de número de celular inválido. Exemplo correto: 5511912345678")
         String phone
 ) {
 }

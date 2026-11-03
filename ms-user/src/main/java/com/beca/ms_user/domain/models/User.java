@@ -43,7 +43,7 @@ public class User {
         this.updatedAt = OffsetDateTime.now();
     }
 
-    public static  User prepareUpdate(UUID id, String name, String phone) {
+    public static User prepareUpdate(UUID id, String name, String phone) {
         return new User(id, name, null, null, phone, null, null, null);
     }
 

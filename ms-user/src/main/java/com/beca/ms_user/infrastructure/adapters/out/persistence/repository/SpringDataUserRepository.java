@@ -11,5 +11,5 @@ public interface SpringDataUserRepository extends JpaRepository<UserJpaEntity, U
     Optional<UserJpaEntity> findByEmailAndDeletedAtIsNull(String email);
     Optional<UserJpaEntity> findByCpfAndDeletedAtIsNull(String cpf);
     Optional<UserJpaEntity> findByIdAndDeletedAtIsNull(UUID id);
-    List<UserJpaEntity> findAllByDeletedIsNull();
+    List<UserJpaEntity> findAllByDeletedAtIsNull();
 }

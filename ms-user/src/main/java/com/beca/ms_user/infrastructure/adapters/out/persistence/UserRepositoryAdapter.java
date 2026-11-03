@@ -44,7 +44,7 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
 
     @Override
     public List<User> findAll() {
-        return repository.findAllByDeletedIsNull().stream().map(this::toDomain).collect(Collectors.toList());
+        return repository.findAllByDeletedAtIsNull().stream().map(this::toDomain).collect(Collectors.toList());
     }
 
     @Override

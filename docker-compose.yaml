@@ -10,7 +10,7 @@ services:
       POSTGRES_USER: ${MS_USERS_DB_USER}
       POSTGRES_PASSWORD: ${MS_USERS_DB_PASS}
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - user_db_data:/var/lib/postgresql/data
     networks:
