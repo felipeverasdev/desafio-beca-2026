@@ -46,7 +46,7 @@ public class UserController {
     })
     @PostMapping
     public ResponseEntity<UserResponseDTO> create(@RequestBody @Valid UserRequestDTO dto) {
-        User userDomain = new User(null, dto.name(), dto.email(), dto.cpf(), dto.phone(),  );
+        User userDomain = User.prepareCreate(dto.name(), dto.email(), dto.cpf(), dto.phone());
         User created = createUserUseCase.execute(userDomain);
 
         UserResponseDTO response = new UserResponseDTO(created.getId(), created.getName(),

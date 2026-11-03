@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://local:5432/user_db
-    username: ${USER_DB_USER}
-    password: ${USER_DB_PASS}
+    url: ${MS_USERS_DB_URL}
+    username: ${MS_USERS_DB_USER}
+    password: ${MS_USERS_DB_PASS}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -11,5 +11,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
   application:
     name: ms-user
