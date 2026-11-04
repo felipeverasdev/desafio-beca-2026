@@ -34,7 +34,7 @@ public class User {
     }
 
     public static User prepareCreate(String name, String email, String cpf, String phone) {
-        return new User(null, name, email, cpf, phone, null, null, null);
+        return new User(null, name.trim(), email.trim(), cpf.trim(), phone.trim(), null, null, null);
     }
 
     public void updatePersonalData(String newName, String newPhone) {

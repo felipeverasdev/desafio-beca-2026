@@ -20,13 +20,13 @@ public class UserJpaEntity {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String email;
 
-    @Column(nullable = false, unique = true, length = 11)
+    @Column(nullable = false, length = 11)
     private String cpf;
 
-    @Column(nullable = false, unique = true, length = 13)
+    @Column(nullable = false, length = 13)
     private String phone;
 
     @CreatedDate
