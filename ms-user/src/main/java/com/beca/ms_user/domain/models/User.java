@@ -33,14 +33,14 @@ public class User {
 
     public static User create(String name, String email, String password, String cpf, String phone) {
         return new User(
-                UUID.randomUUID(),
+                null,
                 name,
                 email,
                 password,
                 cpf,
                 phone,
-                OffsetDateTime.now(),
-                OffsetDateTime.now(),
+                null,
+                null,
                 null
         );
     }

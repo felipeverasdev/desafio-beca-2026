@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class UserTest {
 
     @Test
-    @DisplayName("Deve criar um usuário com ID gerado e timestamps corretos através do método estático create")
+    @DisplayName("Deve preparar criação de usuário sem ID prévio antes da persistência")
     void shouldCreateUserSuccessfully() {
         User user = User.create(
                 "Lucas Silva",
@@ -21,36 +21,28 @@ class UserTest {
                 "5511987654321"
         );
 
-        assertNotNull(user.getId());
+        assertNull(user.getId());
         assertEquals("Lucas Silva", user.getName());
         assertEquals("lucas@email.com", user.getEmail());
         assertEquals("$2a$10$encodedPasswordHash", user.getPassword());
         assertEquals("12345678901", user.getCpf());
         assertEquals("5511987654321", user.getPhone());
-        assertNotNull(user.getCreatedAt());
-        assertNotNull(user.getUpdatedAt());
         assertNull(user.getDeletedAt());
     }
 
     @Test
     @DisplayName("Deve atualizar dados pessoais e registrar nova data em updatedAt")
-    void shouldUpdatePersonalData() throws InterruptedException {
-        User user = User.create(
-                "Lucas Silva",
-                "lucas@email.com",
-                "$2a$10$encodedPasswordHash",
-                "12345678901",
-                "5511987654321"
-        );
-
-        OffsetDateTime initialUpdatedAt = user.getUpdatedAt();
-        Thread.sleep(10);
+    void shouldUpdatePersonalData() {
+        UUID id = UUID.randomUUID();
+        OffsetDateTime created = OffsetDateTime.now().minusHours(1);
+        User user = new User(id, "Lucas Silva", "lucas@email.com", "$2a$10$encodedPasswordHash",
+                "12345678901", "5511987654321", created, created, null);
 
         user.updatePersonalData("Lucas S. Atualizado", "5511999998888");
 
         assertEquals("Lucas S. Atualizado", user.getName());
         assertEquals("5511999998888", user.getPhone());
-        assertTrue(user.getUpdatedAt().isAfter(initialUpdatedAt) || user.getUpdatedAt().isEqual(initialUpdatedAt));
+        assertTrue(user.getUpdatedAt().isAfter(created));
     }
 
     @Test
