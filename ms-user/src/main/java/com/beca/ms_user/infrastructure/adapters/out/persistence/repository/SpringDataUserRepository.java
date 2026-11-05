@@ -1,6 +1,8 @@
 package com.beca.ms_user.infrastructure.adapters.out.persistence.repository;
 
 import com.beca.ms_user.infrastructure.adapters.out.persistence.entity.UserJpaEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -11,5 +13,5 @@ public interface SpringDataUserRepository extends JpaRepository<UserJpaEntity, U
     Optional<UserJpaEntity> findByEmailAndDeletedAtIsNull(String email);
     Optional<UserJpaEntity> findByCpfAndDeletedAtIsNull(String cpf);
     Optional<UserJpaEntity> findByIdAndDeletedAtIsNull(UUID id);
-    List<UserJpaEntity> findAllByDeletedAtIsNull();
+    Page<UserJpaEntity> findAllByDeletedAtIsNull(Pageable pageable);
 }

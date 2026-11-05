@@ -1,9 +1,6 @@
 package com.beca.ms_user.infrastructure.adapters.in.rest;
 
-import com.beca.ms_user.application.ports.in.CreateUserUseCase;
-import com.beca.ms_user.application.ports.in.DeleteUserUseCase;
-import com.beca.ms_user.application.ports.in.FindUserUseCase;
-import com.beca.ms_user.application.ports.in.UpdateUserUseCase;
+import com.beca.ms_user.application.ports.in.*;
 import com.beca.ms_user.domain.models.User;
 import com.beca.ms_user.infrastructure.adapters.in.rest.dto.UserRequestDTO;
 import com.beca.ms_user.infrastructure.adapters.in.rest.dto.UserResponseDTO;
@@ -14,17 +11,19 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "Users",
         description = "Endpoints para gerenciamento do ciclo de vida de usuários")
 @RestController
-@RequestMapping("/users")
+@RequestMapping("/api/v1/users")
 public class UserController {
     private final CreateUserUseCase createUserUseCase;
     private final FindUserUseCase findUserUseCase;
@@ -47,9 +46,9 @@ public class UserController {
     @PostMapping
     public ResponseEntity<UserResponseDTO> create(@RequestBody @Valid UserRequestDTO dto) {
         CreateUserCommand userCommand = new CreateUserCommand(
-                dto.name(), dto.email(), dto.cpf(), dto.phone()
+                dto.name().trim(), dto.email().trim(), dto.cpf().trim(), dto.phone().trim()
         );
-        User created = createUserUseCase.execute(userCommand);
+        User created = createUserUseCase.create(userCommand);
 
         UserResponseDTO response = new UserResponseDTO(created.getId(), created.getName(),
                 created.getEmail(), created.getCpf(), created.getPhone(),
@@ -57,17 +56,16 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @Operation(summary = "Listar todos os usuários cadastrados")
+    @Operation(summary = "Listar todos os usuários cadastrados (size = 10 por padrão)")
     @GetMapping
-    public ResponseEntity<List<UserSummaryDTO>> findAll() {
-        List<User> usersDomain = findUserUseCase.findAll();
+    public ResponseEntity<Page<UserSummaryDTO>> findAll(@PageableDefault(size = 10) Pageable pageable) {
+        Page<User> usersDomain = findUserUseCase.findAll(pageable);
 
-        List<UserSummaryDTO> response = usersDomain.stream()
-                .map(user -> new UserSummaryDTO(
+        Page<UserSummaryDTO> response = usersDomain.map(user -> new UserSummaryDTO(
                         user.getId(),
                         user.getName(),
                         user.getEmail()
-                )).toList();
+                ));
 
         return ResponseEntity.ok(response);
     }
@@ -98,7 +96,9 @@ public class UserController {
     @PutMapping("/{id}")
     public ResponseEntity<UserResponseDTO> update(@PathVariable UUID id,
                                        @RequestBody @Valid UserUpdateDTO dto) {
-        User updated = User.prepareUpdate(id, dto.name(), dto.phone());
+        UpdateUserCommand updated = new UpdateUserCommand(
+                dto.name().trim(), dto.phone().trim()
+        );
         User saved = updateUserUseCase.update(id, updated);
 
         UserResponseDTO response = new UserResponseDTO(

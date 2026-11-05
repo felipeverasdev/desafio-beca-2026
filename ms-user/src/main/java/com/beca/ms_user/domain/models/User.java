@@ -1,9 +1,5 @@
 package com.beca.ms_user.domain.models;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -33,18 +29,23 @@ public class User {
         this.deletedAt = deletedAt;
     }
 
-    public static User prepareCreate(String name, String email, String cpf, String phone) {
-        return new User(null, name.trim(), email.trim(), cpf.trim(), phone.trim(), null, null, null);
+    public static User Create(String name, String email, String cpf, String phone) {
+        return new User(
+                UUID.randomUUID(),
+                name,
+                email,
+                cpf,
+                phone,
+                OffsetDateTime.now(),
+                OffsetDateTime.now(),
+                null
+        );
     }
 
     public void updatePersonalData(String newName, String newPhone) {
         this.name = newName;
         this.phone = newPhone;
         this.updatedAt = OffsetDateTime.now();
-    }
-
-    public static User prepareUpdate(UUID id, String name, String phone) {
-        return new User(id, name, null, null, phone, null, null, null);
     }
 
     public void delete() {

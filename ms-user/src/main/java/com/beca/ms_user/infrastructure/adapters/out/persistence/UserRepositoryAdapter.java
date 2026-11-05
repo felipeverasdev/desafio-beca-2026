@@ -1,15 +1,16 @@
 package com.beca.ms_user.infrastructure.adapters.out.persistence;
 
+import com.beca.ms_user.application.ports.in.CreateUserCommand;
 import com.beca.ms_user.application.ports.out.UserRepositoryPort;
 import com.beca.ms_user.domain.models.User;
 import com.beca.ms_user.infrastructure.adapters.out.persistence.entity.UserJpaEntity;
 import com.beca.ms_user.infrastructure.adapters.out.persistence.repository.SpringDataUserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Component
 public class UserRepositoryAdapter implements UserRepositoryPort {
@@ -43,13 +44,8 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
     }
 
     @Override
-    public List<User> findAll() {
-        return repository.findAllByDeletedAtIsNull().stream().map(this::toDomain).collect(Collectors.toList());
-    }
-
-    @Override
-    public void deleteById(UUID id) {
-        repository.deleteById(id);
+    public Page<User> findAll(Pageable pageable) {
+        return repository.findAllByDeletedAtIsNull(pageable).map(this::toDomain);
     }
 
     private User toDomain(UserJpaEntity entity) {

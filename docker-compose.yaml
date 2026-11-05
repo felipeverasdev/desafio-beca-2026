@@ -1,4 +1,12 @@
 services:
+  ms-user:
+    build: ./ms-user
+    env_file:
+      - .env
+  ms-transaction:
+    build: ./ms-transaction
+    env_file:
+      - .env
 
 # User database
   user-db:

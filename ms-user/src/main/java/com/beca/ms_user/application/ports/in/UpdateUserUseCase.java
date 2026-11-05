@@ -5,5 +5,5 @@ import com.beca.ms_user.domain.models.User;
 import java.util.UUID;
 
 public interface UpdateUserUseCase {
-    User update(UUID id, User user);
+    User update(UUID id, UpdateUserCommand userCommand);
 }
