@@ -1,5 +1,6 @@
 package com.beca.ms_user.infrastructure.adapters.in.rest.exception;
 
+import com.beca.ms_user.domain.exceptions.InvalidCredentialsException;
 import com.beca.ms_user.domain.exceptions.ResourceAlreadyExistsException;
 import com.beca.ms_user.domain.exceptions.UserNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -82,6 +83,20 @@ public class GlobalExceptionHandler {
                 Instant.now(),
                 status.value(),
                 "Data Integrity Violation",
+                e.getMessage(),
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(status).body(err);
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<StandardError> invalidCredentials(InvalidCredentialsException e, HttpServletRequest request) {
+        HttpStatus status = HttpStatus.UNAUTHORIZED;
+        StandardError err = new StandardError(
+                Instant.now(),
+                status.value(),
+                "Unauthorized",
                 e.getMessage(),
                 request.getRequestURI()
         );

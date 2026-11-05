@@ -2,6 +2,7 @@ package com.beca.ms_user.infrastructure.adapters.in.rest;
 
 import com.beca.ms_user.application.ports.in.*;
 import com.beca.ms_user.domain.models.User;
+import com.beca.ms_user.infrastructure.adapters.in.rest.dto.AuthRequestDTO;
 import com.beca.ms_user.infrastructure.adapters.in.rest.dto.UserRequestDTO;
 import com.beca.ms_user.infrastructure.adapters.in.rest.dto.UserResponseDTO;
 import com.beca.ms_user.infrastructure.adapters.in.rest.dto.UserSummaryDTO;
@@ -29,12 +30,18 @@ public class UserController {
     private final FindUserUseCase findUserUseCase;
     private final UpdateUserUseCase updateUserUseCase;
     private final DeleteUserUseCase deleteUserUseCase;
+    private final AuthenticateUserUseCase authenticateUserUseCase;
 
-    public UserController(CreateUserUseCase createUserUseCase, FindUserUseCase findUserUseCase, UpdateUserUseCase updateUserUseCase, DeleteUserUseCase deleteUserUseCase) {
+    public UserController(CreateUserUseCase createUserUseCase,
+                          FindUserUseCase findUserUseCase,
+                          UpdateUserUseCase updateUserUseCase,
+                          DeleteUserUseCase deleteUserUseCase,
+                          AuthenticateUserUseCase authenticateUserUseCase) {
         this.createUserUseCase = createUserUseCase;
         this.findUserUseCase = findUserUseCase;
         this.updateUserUseCase = updateUserUseCase;
         this.deleteUserUseCase = deleteUserUseCase;
+        this.authenticateUserUseCase = authenticateUserUseCase;
     }
 
     @Operation(summary = "Criar um novo usuário",
@@ -46,7 +53,7 @@ public class UserController {
     @PostMapping
     public ResponseEntity<UserResponseDTO> create(@RequestBody @Valid UserRequestDTO dto) {
         CreateUserCommand userCommand = new CreateUserCommand(
-                dto.name().trim(), dto.email().trim(), dto.cpf().trim(), dto.phone().trim()
+                dto.name().trim(), dto.email().trim(), dto.password(), dto.cpf().trim(), dto.phone().trim()
         );
         User created = createUserUseCase.create(userCommand);
 
@@ -54,6 +61,29 @@ public class UserController {
                 created.getEmail(), created.getCpf(), created.getPhone(),
                 created.getCreatedAt(), created.getUpdatedAt());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @Operation(summary = "Autenticar usuário",
+            description = "Valida as credenciais (e-mail e senha) e retorna os dados do usuário autenticado")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Autenticado com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Credenciais inválidas")
+    })
+    @PostMapping("/auth")
+    public ResponseEntity<UserResponseDTO> authenticate(@RequestBody @Valid AuthRequestDTO dto) {
+        User user = authenticateUserUseCase.authenticate(dto.email().trim(), dto.password());
+
+        UserResponseDTO response = new UserResponseDTO(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getCpf(),
+                user.getPhone(),
+                user.getCreatedAt(),
+                user.getUpdatedAt()
+        );
+
+        return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Listar todos os usuários cadastrados (size = 10 por padrão)")
@@ -78,6 +108,28 @@ public class UserController {
     @GetMapping("/{id}")
     public ResponseEntity<UserResponseDTO> findById(@PathVariable UUID id) {
         User user = findUserUseCase.findById(id);
+
+        UserResponseDTO response = new UserResponseDTO(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getCpf(),
+                user.getPhone(),
+                user.getCreatedAt(),
+                user.getUpdatedAt()
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Buscar usuário por e-mail")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Usuário encontrado"),
+            @ApiResponse(responseCode = "404", description = "Usuário não localizado no sistema")
+    })
+    @GetMapping("/by-email")
+    public ResponseEntity<UserResponseDTO> findByEmail(@RequestParam String email) {
+        User user = findUserUseCase.findByEmail(email.trim());
 
         UserResponseDTO response = new UserResponseDTO(
                 user.getId(),

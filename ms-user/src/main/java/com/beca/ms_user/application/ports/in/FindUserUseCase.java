@@ -8,5 +8,6 @@ import java.util.UUID;
 
 public interface FindUserUseCase {
     User findById(UUID id);
+    User findByEmail(String email);
     Page<User> findAll(Pageable pageable);
 }

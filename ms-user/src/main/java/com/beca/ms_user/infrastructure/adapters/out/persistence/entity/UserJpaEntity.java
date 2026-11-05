@@ -23,6 +23,9 @@ public class UserJpaEntity {
     @Column(nullable = false)
     private String email;
 
+    @Column(nullable = false)
+    private String password;
+
     @Column(nullable = false, length = 11)
     private String cpf;
 
@@ -43,10 +46,11 @@ public class UserJpaEntity {
     public UserJpaEntity() {
     }
 
-    public UserJpaEntity(UUID id, String name, String email, String cpf, String phone, OffsetDateTime createdAt, OffsetDateTime updatedAt, OffsetDateTime deletedAt) {
+    public UserJpaEntity(UUID id, String name, String email, String password, String cpf, String phone, OffsetDateTime createdAt, OffsetDateTime updatedAt, OffsetDateTime deletedAt) {
         this.id = id;
         this.name = name;
         this.email = email;
+        this.password = password;
         this.cpf = cpf;
         this.phone = phone;
         this.createdAt = createdAt;
@@ -68,6 +72,10 @@ public class UserJpaEntity {
 
     public String getEmail() {
         return email;
+    }
+
+    public String getPassword() {
+        return password;
     }
 
     public String getCpf() {

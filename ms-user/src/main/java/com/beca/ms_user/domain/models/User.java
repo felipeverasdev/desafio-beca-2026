@@ -8,6 +8,7 @@ public class User {
     private UUID id;
     private String name;
     private String email;
+    private String password;
     private String cpf;
     private String phone;
     private OffsetDateTime createdAt;
@@ -18,10 +19,11 @@ public class User {
 
     }
 
-    public User(UUID id, String name, String email, String cpf, String phone, OffsetDateTime createdAt, OffsetDateTime updatedAt, OffsetDateTime deletedAt) {
+    public User(UUID id, String name, String email, String password, String cpf, String phone, OffsetDateTime createdAt, OffsetDateTime updatedAt, OffsetDateTime deletedAt) {
         this.id = id;
         this.name = name;
         this.email = email;
+        this.password = password;
         this.cpf = cpf;
         this.phone = phone;
         this.createdAt = createdAt;
@@ -29,11 +31,12 @@ public class User {
         this.deletedAt = deletedAt;
     }
 
-    public static User Create(String name, String email, String cpf, String phone) {
+    public static User create(String name, String email, String password, String cpf, String phone) {
         return new User(
                 UUID.randomUUID(),
                 name,
                 email,
+                password,
                 cpf,
                 phone,
                 OffsetDateTime.now(),
@@ -63,6 +66,10 @@ public class User {
 
     public String getEmail() {
         return email;
+    }
+
+    public String getPassword() {
+        return password;
     }
 
     public String getCpf() {
