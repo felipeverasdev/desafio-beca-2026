@@ -2,11 +2,7 @@ package com.beca.ms_user.infrastructure.adapters.in.rest;
 
 import com.beca.ms_user.application.ports.in.*;
 import com.beca.ms_user.domain.models.User;
-import com.beca.ms_user.infrastructure.adapters.in.rest.dto.AuthRequestDTO;
-import com.beca.ms_user.infrastructure.adapters.in.rest.dto.UserRequestDTO;
-import com.beca.ms_user.infrastructure.adapters.in.rest.dto.UserResponseDTO;
-import com.beca.ms_user.infrastructure.adapters.in.rest.dto.UserSummaryDTO;
-import com.beca.ms_user.infrastructure.adapters.in.rest.dto.UserUpdateDTO;
+import com.beca.ms_user.infrastructure.adapters.in.rest.dto.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -16,9 +12,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "Users",
@@ -31,17 +31,20 @@ public class UserController {
     private final UpdateUserUseCase updateUserUseCase;
     private final DeleteUserUseCase deleteUserUseCase;
     private final AuthenticateUserUseCase authenticateUserUseCase;
+    private final ImportUsersCsvUseCase importUsersCsvUseCase;
 
     public UserController(CreateUserUseCase createUserUseCase,
                           FindUserUseCase findUserUseCase,
                           UpdateUserUseCase updateUserUseCase,
                           DeleteUserUseCase deleteUserUseCase,
-                          AuthenticateUserUseCase authenticateUserUseCase) {
+                          AuthenticateUserUseCase authenticateUserUseCase,
+                          ImportUsersCsvUseCase importUsersCsvUseCase) {
         this.createUserUseCase = createUserUseCase;
         this.findUserUseCase = findUserUseCase;
         this.updateUserUseCase = updateUserUseCase;
         this.deleteUserUseCase = deleteUserUseCase;
         this.authenticateUserUseCase = authenticateUserUseCase;
+        this.importUsersCsvUseCase = importUsersCsvUseCase;
     }
 
     @Operation(summary = "Criar um novo usuário",
@@ -61,6 +64,38 @@ public class UserController {
                 created.getEmail(), created.getCpf(), created.getPhone(),
                 created.getCreatedAt(), created.getUpdatedAt());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @Operation(summary = "Importação em massa de usuários via arquivo CSV",
+            description = "Recebe um arquivo CSV com colunas (name,email,password,cpf,phone). Linhas inválidas ou com e-mails duplicados são reportadas individualmente sem abortar o restante da importação.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Arquivo processado com resumo de sucessos e falhas"),
+            @ApiResponse(responseCode = "400", description = "Arquivo inválido ou não fornecido")
+    })
+    @PostMapping(value = "/upload-csv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<CsvImportResultDTO> uploadCsv(@RequestParam("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("O arquivo CSV não pode estar vazio");
+        }
+
+        try {
+            CsvImportResult result = importUsersCsvUseCase.execute(file.getInputStream());
+
+            List<CsvRowErrorDTO> errorDtos = result.errors().stream()
+                    .map(err -> new CsvRowErrorDTO(err.lineNumber(), err.email(), err.reason()))
+                    .toList();
+
+            CsvImportResultDTO response = new CsvImportResultDTO(
+                    result.totalRows(),
+                    result.successCount(),
+                    result.failureCount(),
+                    errorDtos
+            );
+
+            return ResponseEntity.ok(response);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Falha ao ler o arquivo enviado: " + e.getMessage());
+        }
     }
 
     @Operation(summary = "Autenticar usuário",

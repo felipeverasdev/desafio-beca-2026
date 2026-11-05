@@ -11,10 +11,16 @@ import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUserUseCase, DeleteUserUseCase, AuthenticateUserUseCase {
+public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUserUseCase, DeleteUserUseCase, AuthenticateUserUseCase, ImportUsersCsvUseCase {
     private final UserRepositoryPort userRepositoryPort;
     private final PasswordEncoderPort passwordEncoderPort;
 
@@ -89,6 +95,68 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
         user.delete();
 
         userRepositoryPort.save(user);
+    }
+
+    @Override
+    public CsvImportResult execute(InputStream inputStream) {
+        int totalRows = 0;
+        int successCount = 0;
+        int failureCount = 0;
+        List<CsvRowError> errors = new ArrayList<>();
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+            String line;
+            int lineNumber = 0;
+            boolean isHeader = true;
+
+            while ((line = reader.readLine()) != null) {
+                lineNumber++;
+                String trimmedLine = line.trim();
+                if (trimmedLine.isEmpty()) {
+                    continue;
+                }
+
+                if (isHeader) {
+                    isHeader = false;
+                    String lower = trimmedLine.toLowerCase();
+                    if (lower.contains("name") || lower.contains("nome") || lower.contains("email")) {
+                        continue;
+                    }
+                }
+
+                totalRows++;
+                String delimiter = trimmedLine.contains(";") ? ";" : ",";
+                String[] columns = trimmedLine.split(delimiter, -1);
+
+                if (columns.length < 5) {
+                    failureCount++;
+                    errors.add(new CsvRowError(lineNumber, "", "Formato inválido. Esperadas 5 colunas: name,email,password,cpf,phone"));
+                    continue;
+                }
+
+                String name = columns[0].trim();
+                String email = columns[1].trim();
+                String password = columns[2].trim();
+                String cpf = columns[3].trim();
+                String phone = columns[4].trim();
+
+                try {
+                    CreateUserCommand command = new CreateUserCommand(name, email, password, cpf, phone);
+                    this.create(command);
+                    successCount++;
+                } catch (IllegalArgumentException | ResourceAlreadyExistsException ex) {
+                    failureCount++;
+                    errors.add(new CsvRowError(lineNumber, email, ex.getMessage()));
+                } catch (Exception ex) {
+                    failureCount++;
+                    errors.add(new CsvRowError(lineNumber, email, "Erro inesperado: " + ex.getMessage()));
+                }
+            }
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Erro ao processar leitura do arquivo CSV: " + e.getMessage());
+        }
+
+        return new CsvImportResult(totalRows, successCount, failureCount, errors);
     }
 
 }
