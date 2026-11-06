@@ -1,0 +1,19 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  datasource:
+    url: ${MS_USERS_DB_URL:jdbc:postgresql://localhost:5434/user_db}
+    username: ${MS_USERS_DB_USER:user_admin}
+    password: ${MS_USERS_DB_PASS:123456}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+      show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  application:
+    name: ms-user
