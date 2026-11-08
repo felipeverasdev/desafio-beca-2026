@@ -3,6 +3,7 @@ package com.beca.ms_user.infrastructure.adapters.in.rest;
 import com.beca.ms_user.application.ports.in.*;
 import com.beca.ms_user.domain.models.User;
 import com.beca.ms_user.infrastructure.adapters.in.rest.dto.*;
+import com.beca.ms_user.infrastructure.adapters.out.security.UserSecurityDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -14,6 +15,8 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -182,7 +185,10 @@ public class UserController {
     @Operation(summary = "Atualizar dados de um usuário existente")
     @PutMapping("/{id}")
     public ResponseEntity<UserResponseDTO> update(@PathVariable UUID id,
-                                       @RequestBody @Valid UserUpdateDTO dto) {
+                                                  @RequestBody @Valid UserUpdateDTO dto,
+                                                  @AuthenticationPrincipal UserSecurityDetails authenticatedUser) {
+        validateOwnership(authenticatedUser, id);
+
         UpdateUserCommand updated = new UpdateUserCommand(
                 dto.name().trim(), dto.phone().trim()
         );
@@ -205,8 +211,17 @@ public class UserController {
     description = "Deve desativar o usuário, mas manter os seus dados no banco de dados.")
     @ApiResponse(responseCode = "204", description = "Usuário removido com sucesso")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+    public ResponseEntity<Void> delete(@PathVariable UUID id,
+                                       @AuthenticationPrincipal UserSecurityDetails authenticatedUser) {
+        validateOwnership(authenticatedUser, id);
+
         deleteUserUseCase.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private void validateOwnership(UserSecurityDetails authenticatedUser, UUID targetId) {
+        if (authenticatedUser == null || !authenticatedUser.getId().equals(targetId)) {
+            throw new AccessDeniedException("Você não tem permissão para alterar ou excluir outro usuário");
+        }
     }
 }
