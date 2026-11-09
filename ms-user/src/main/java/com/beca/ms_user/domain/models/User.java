@@ -33,20 +33,21 @@ public class User {
 
     public static User create(String name, String email, String password, String cpf, String phone) {
         return new User(
-                UUID.randomUUID(),
+                null,
                 name,
                 email,
                 password,
                 cpf,
                 phone,
-                OffsetDateTime.now(),
-                OffsetDateTime.now(),
+                null,
+                null,
                 null
         );
     }
 
-    public void updatePersonalData(String newName, String newPhone) {
+    public void updatePersonalData(String newName, String newEmail, String newPhone) {
         this.name = newName;
+        this.email = newEmail;
         this.phone = newPhone;
         this.updatedAt = OffsetDateTime.now();
     }
