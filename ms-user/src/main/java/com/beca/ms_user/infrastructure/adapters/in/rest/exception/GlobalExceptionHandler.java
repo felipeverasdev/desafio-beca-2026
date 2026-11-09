@@ -4,6 +4,8 @@ import com.beca.ms_user.domain.exceptions.InvalidCredentialsException;
 import com.beca.ms_user.domain.exceptions.ResourceAlreadyExistsException;
 import com.beca.ms_user.domain.exceptions.UserNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +18,7 @@ import java.time.Instant;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ValidationError> validation(MethodArgumentNotValidException e, HttpServletRequest request) {
         HttpStatus status = HttpStatus.BAD_REQUEST;
@@ -78,12 +81,14 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<StandardError> dataIntegrityViolation(DataIntegrityViolationException e, HttpServletRequest request) {
+        log.error("Violação de integridade de dados na requisição [{}]: {}", request.getRequestURI(), e.getMessage(), e);
+
         HttpStatus status = HttpStatus.CONFLICT;
         StandardError err = new StandardError(
                 Instant.now(),
                 status.value(),
                 "Data Integrity Violation",
-                e.getMessage(),
+                "Violação de integridade de dados. O registro já existe ou viola restrições do banco.",
                 request.getRequestURI()
         );
 
@@ -98,6 +103,20 @@ public class GlobalExceptionHandler {
                 status.value(),
                 "Unauthorized",
                 e.getMessage(),
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(status).body(err);
+    }
+
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<StandardError> accessDenied(org.springframework.security.access.AccessDeniedException e, HttpServletRequest request) {
+        HttpStatus status = HttpStatus.FORBIDDEN;
+        StandardError err = new StandardError(
+                Instant.now(),
+                status.value(),
+                "Forbidden",
+                e.getMessage() != null ? e.getMessage() : "Acesso negado",
                 request.getRequestURI()
         );
 

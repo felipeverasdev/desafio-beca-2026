@@ -49,7 +49,8 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
 
     @Override
     public User authenticate(String email, String rawPassword) {
-        User user = userRepositoryPort.findByEmail(email)
+        String normalizedEmail = email != null ? email.trim().toLowerCase() : "";
+        User user = userRepositoryPort.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new InvalidCredentialsException("Credenciais inválidas"));
 
         if (!passwordEncoderPort.matches(rawPassword, user.getPassword())) {
@@ -67,7 +68,8 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
 
     @Override
     public User findByEmail(String email) {
-        return userRepositoryPort.findByEmail(email)
+        String normalizedEmail = email != null ? email.trim().toLowerCase() : "";
+        return userRepositoryPort.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new UserNotFoundException("Usuário não encontrado. E-mail: " + email));
     }
 
@@ -81,7 +83,15 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
     public User update(UUID id, UpdateUserCommand command) {
         User currentUser = findById(id);
 
-        currentUser.updatePersonalData(command.name(), command.phone());
+        String normalizedEmail = command.email().trim().toLowerCase();
+        if (!currentUser.getEmail().equalsIgnoreCase(normalizedEmail)) {
+            userRepositoryPort.findByEmail(normalizedEmail)
+                    .ifPresent(u -> {
+                        throw new ResourceAlreadyExistsException("E-mail já cadastrado no sistema.");
+                    });
+        }
+
+        currentUser.updatePersonalData(command.name(), normalizedEmail, command.phone());
 
         return userRepositoryPort.save(currentUser);
     }
@@ -135,7 +145,11 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
                 }
 
                 String name = columns[0].trim();
+<<<<<<< HEAD
                 String email = columns[1].trim();
+=======
+                String email = columns[1].trim().toLowerCase();
+>>>>>>> feature/ms-user-service-improvement
                 String password = columns[2].trim();
                 String cpf = columns[3].trim();
                 String phone = columns[4].trim();

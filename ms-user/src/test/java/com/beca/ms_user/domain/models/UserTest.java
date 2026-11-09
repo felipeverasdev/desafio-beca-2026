@@ -38,9 +38,16 @@ class UserTest {
         User user = new User(id, "Lucas Silva", "lucas@email.com", "$2a$10$encodedPasswordHash",
                 "12345678901", "5511987654321", created, created, null);
 
+<<<<<<< HEAD
         user.updatePersonalData("Lucas S. Atualizado", "5511999998888");
 
         assertEquals("Lucas S. Atualizado", user.getName());
+=======
+        user.updatePersonalData("Lucas S. Atualizado", "lucas.atualizado@email.com", "5511999998888");
+
+        assertEquals("Lucas S. Atualizado", user.getName());
+        assertEquals("lucas.atualizado@email.com", user.getEmail());
+>>>>>>> feature/ms-user-service-improvement
         assertEquals("5511999998888", user.getPhone());
         assertTrue(user.getUpdatedAt().isAfter(created));
     }
