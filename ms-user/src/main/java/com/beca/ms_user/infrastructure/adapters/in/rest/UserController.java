@@ -3,15 +3,13 @@ package com.beca.ms_user.infrastructure.adapters.in.rest;
 import com.beca.ms_user.application.ports.in.*;
 import com.beca.ms_user.domain.models.User;
 import com.beca.ms_user.infrastructure.adapters.in.rest.dto.*;
-<<<<<<< HEAD
-=======
 import com.beca.ms_user.infrastructure.adapters.out.security.UserSecurityDetails;
->>>>>>> feature/ms-user-service-improvement
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -129,7 +127,7 @@ public class UserController {
 
     @Operation(summary = "Listar todos os usuários cadastrados (size = 10 por padrão)")
     @GetMapping
-    public ResponseEntity<Page<UserSummaryDTO>> findAll(@PageableDefault(size = 10) Pageable pageable) {
+    public ResponseEntity<Page<UserSummaryDTO>> findAll(@ParameterObject @PageableDefault(size = 10) Pageable pageable) {
         Page<User> usersDomain = findUserUseCase.findAll(pageable);
 
         Page<UserSummaryDTO> response = usersDomain.map(user -> new UserSummaryDTO(
@@ -222,8 +220,43 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Listar usuários excluídos do sistema (Apenas Administrador)",
+            description = "Retorna todos os usuários desativados (soft-deleted). Exige autenticação com perfil de administrador.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista de usuários deletados retornada com sucesso"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado: apenas administradores podem acessar esta rota")
+    })
+    @GetMapping("/deleted")
+    public ResponseEntity<Page<UserResponseDTO>> findDeleted(
+            @ParameterObject @PageableDefault(size = 10) Pageable pageable,
+            @AuthenticationPrincipal UserSecurityDetails authenticatedUser) {
+        if (authenticatedUser == null || !authenticatedUser.isAdmin()) {
+            throw new AccessDeniedException("Apenas administradores podem visualizar usuários excluídos do sistema");
+        }
+
+        Page<User> deletedUsers = findUserUseCase.findAllDeleted(pageable);
+        Page<UserResponseDTO> response = deletedUsers.map(user -> new UserResponseDTO(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getCpf(),
+                user.getPhone(),
+                user.getCreatedAt(),
+                user.getUpdatedAt(),
+                user.getDeletedAt()
+        ));
+
+        return ResponseEntity.ok(response);
+    }
+
     private void validateOwnership(UserSecurityDetails authenticatedUser, UUID targetId) {
-        if (authenticatedUser == null || !authenticatedUser.getId().equals(targetId)) {
+        if (authenticatedUser == null) {
+            throw new AccessDeniedException("Autenticação necessária");
+        }
+        if (authenticatedUser.isAdmin()) {
+            return;
+        }
+        if (!authenticatedUser.getId().equals(targetId)) {
             throw new AccessDeniedException("Você não tem permissão para alterar ou excluir outro usuário");
         }
     }

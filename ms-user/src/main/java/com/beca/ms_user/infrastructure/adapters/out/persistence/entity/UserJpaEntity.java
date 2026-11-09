@@ -43,10 +43,17 @@ public class UserJpaEntity {
     @Column(name = "deleted_at")
     private OffsetDateTime deletedAt;
 
+    @Column(nullable = false, length = 20)
+    private String role = "ROLE_USER";
+
     public UserJpaEntity() {
     }
 
     public UserJpaEntity(UUID id, String name, String email, String password, String cpf, String phone, OffsetDateTime createdAt, OffsetDateTime updatedAt, OffsetDateTime deletedAt) {
+        this(id, name, email, password, cpf, phone, createdAt, updatedAt, deletedAt, "ROLE_USER");
+    }
+
+    public UserJpaEntity(UUID id, String name, String email, String password, String cpf, String phone, OffsetDateTime createdAt, OffsetDateTime updatedAt, OffsetDateTime deletedAt, String role) {
         this.id = id;
         this.name = name;
         this.email = email;
@@ -56,6 +63,7 @@ public class UserJpaEntity {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.deletedAt = deletedAt;
+        this.role = (role != null && !role.isBlank()) ? role : "ROLE_USER";
     }
 
     public UUID getId() {
@@ -104,5 +112,13 @@ public class UserJpaEntity {
 
     public OffsetDateTime getDeletedAt() {
         return deletedAt;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
     }
 }

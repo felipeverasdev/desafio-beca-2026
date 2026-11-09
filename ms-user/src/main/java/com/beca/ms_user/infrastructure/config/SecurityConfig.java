@@ -40,12 +40,15 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"
                         ).permitAll()
+                        // Rota exclusiva para administrador
+                        .requestMatchers("/api/v1/users/deleted").hasRole("ADMIN")
                         // Todas as demais rotas requerem autenticação (HTTP Basic)
                         .anyRequest().authenticated()
                 )
                 .httpBasic(Customizer.withDefaults())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, authException) -> {
+                            response.setHeader("WWW-Authenticate", "Basic realm=\"ms-user\"");
                             response.setContentType("application/json;charset=UTF-8");
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.getWriter().write("""

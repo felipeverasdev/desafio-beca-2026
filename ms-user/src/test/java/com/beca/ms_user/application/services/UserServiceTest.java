@@ -169,32 +169,21 @@ class UserServiceTest {
     @DisplayName("Deve atualizar dados pessoais de um usuário existente")
     void shouldUpdateUserSuccessfully() {
         UUID id = sampleUser.getId();
-<<<<<<< HEAD
-        UpdateUserCommand updateCommand = new UpdateUserCommand("João Atualizado", "5511900001111");
-
-        when(userRepositoryPort.findById(id)).thenReturn(Optional.of(sampleUser));
-=======
         UpdateUserCommand updateCommand = new UpdateUserCommand("João Atualizado", "joao.novo@email.com", "5511900001111");
 
         when(userRepositoryPort.findById(id)).thenReturn(Optional.of(sampleUser));
         when(userRepositoryPort.findByEmail("joao.novo@email.com")).thenReturn(Optional.empty());
->>>>>>> feature/ms-user-service-improvement
         when(userRepositoryPort.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         User updated = userService.update(id, updateCommand);
 
         assertEquals("João Atualizado", updated.getName());
-<<<<<<< HEAD
-=======
         assertEquals("joao.novo@email.com", updated.getEmail());
->>>>>>> feature/ms-user-service-improvement
         assertEquals("5511900001111", updated.getPhone());
         verify(userRepositoryPort).save(sampleUser);
     }
 
     @Test
-<<<<<<< HEAD
-=======
     @DisplayName("Deve lançar ResourceAlreadyExistsException quando tentar atualizar para um e-mail já existente")
     void shouldThrowExceptionWhenUpdatingToExistingEmail() {
         UUID id = sampleUser.getId();
@@ -208,7 +197,6 @@ class UserServiceTest {
     }
 
     @Test
->>>>>>> feature/ms-user-service-improvement
     @DisplayName("Deve realizar soft delete em usuário existente")
     void shouldDeleteUserSuccessfully() {
         UUID id = sampleUser.getId();
@@ -325,8 +313,6 @@ class UserServiceTest {
         assertEquals(0, result.failureCount());
         verify(userRepositoryPort, times(1)).save(any(User.class));
     }
-<<<<<<< HEAD
-=======
 
     @Test
     @DisplayName("Deve reportar erro na linha para CPF, telefone ou email inválidos no CSV")
@@ -372,5 +358,20 @@ class UserServiceTest {
         assertNotNull(found);
         verify(userRepositoryPort).findByEmail("joao@email.com");
     }
->>>>>>> feature/ms-user-service-improvement
+
+    @Test
+    @DisplayName("Deve listar usuários deletados com paginação")
+    void shouldFindAllDeletedUsers() {
+        Pageable pageable = PageRequest.of(0, 10);
+        sampleUser.delete();
+        Page<User> deletedPage = new PageImpl<>(List.of(sampleUser), pageable, 1);
+        when(userRepositoryPort.findAllDeleted(pageable)).thenReturn(deletedPage);
+
+        Page<User> result = userService.findAllDeleted(pageable);
+
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertNotNull(result.getContent().get(0).getDeletedAt());
+        verify(userRepositoryPort).findAllDeleted(pageable);
+    }
 }

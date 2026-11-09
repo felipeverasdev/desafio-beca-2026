@@ -15,4 +15,5 @@ public interface UserRepositoryPort {
     Optional<User> findByEmail(String email);
     Optional<User> findByCpf(String cpf);
     Page<User> findAll(Pageable pageable);
+    Page<User> findAllDeleted(Pageable pageable);
 }

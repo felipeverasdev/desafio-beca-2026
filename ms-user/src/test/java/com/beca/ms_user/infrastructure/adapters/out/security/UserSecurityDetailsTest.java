@@ -30,6 +30,20 @@ class UserSecurityDetailsTest {
         assertTrue(details.isCredentialsNonExpired());
         assertEquals(1, details.getAuthorities().size());
         assertTrue(details.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_USER")));
+        assertFalse(details.isAdmin());
+    }
+
+    @Test
+    @DisplayName("Deve reconhecer permissões de administrador")
+    void shouldRecognizeAdminRole() {
+        User adminUser = new User(UUID.randomUUID(), "Admin", "admin@beca.com", "hash123", "00000000000", "5511900000000",
+                OffsetDateTime.now(), OffsetDateTime.now(), null, "ROLE_ADMIN");
+
+        UserSecurityDetails details = new UserSecurityDetails(adminUser);
+
+        assertTrue(details.isAdmin());
+        assertEquals("ROLE_ADMIN", details.getRole());
+        assertTrue(details.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")));
     }
 
     @Test

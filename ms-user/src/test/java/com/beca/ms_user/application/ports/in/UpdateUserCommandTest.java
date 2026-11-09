@@ -8,37 +8,16 @@ import static org.junit.jupiter.api.Assertions.*;
 class UpdateUserCommandTest {
 
     @Test
-<<<<<<< HEAD
-    @DisplayName("Deve instanciar UpdateUserCommand com sucesso quando os dados forem válidos")
-    void shouldCreateCommandSuccessfully() {
-        UpdateUserCommand command = new UpdateUserCommand("Fernanda Lima", "5511987654321");
-
-        assertEquals("Fernanda Lima", command.name());
-=======
     @DisplayName("Deve instanciar UpdateUserCommand com sucesso e converter e-mail para minúsculo")
     void shouldCreateCommandSuccessfully() {
         UpdateUserCommand command = new UpdateUserCommand("Fernanda Lima", "FERNANDA@EMAIL.COM", "5511987654321");
 
         assertEquals("Fernanda Lima", command.name());
         assertEquals("fernanda@email.com", command.email());
->>>>>>> feature/ms-user-service-improvement
         assertEquals("5511987654321", command.phone());
     }
 
     @Test
-<<<<<<< HEAD
-    @DisplayName("Deve lançar exceção quando o nome for nulo ou em branco")
-    void shouldThrowExceptionWhenNameIsInvalid() {
-        assertThrows(IllegalArgumentException.class, () -> new UpdateUserCommand(null, "5511987654321"));
-        assertThrows(IllegalArgumentException.class, () -> new UpdateUserCommand("   ", "5511987654321"));
-    }
-
-    @Test
-    @DisplayName("Deve lançar exceção quando o celular for nulo ou em branco")
-    void shouldThrowExceptionWhenPhoneIsInvalid() {
-        assertThrows(IllegalArgumentException.class, () -> new UpdateUserCommand("Fernanda", null));
-        assertThrows(IllegalArgumentException.class, () -> new UpdateUserCommand("Fernanda", "   "));
-=======
     @DisplayName("Deve lançar exceção quando o nome for nulo, em branco ou menor que 3 caracteres")
     void shouldThrowExceptionWhenNameIsInvalid() {
         assertThrows(IllegalArgumentException.class, () -> new UpdateUserCommand(null, "fernanda@email.com", "5511987654321"));
@@ -60,7 +39,6 @@ class UpdateUserCommandTest {
         assertThrows(IllegalArgumentException.class, () -> new UpdateUserCommand("Fernanda", "fernanda@email.com", null));
         assertThrows(IllegalArgumentException.class, () -> new UpdateUserCommand("Fernanda", "fernanda@email.com", "   "));
         assertThrows(IllegalArgumentException.class, () -> new UpdateUserCommand("Fernanda", "fernanda@email.com", "11987654321"));
->>>>>>> feature/ms-user-service-improvement
     }
 }
 

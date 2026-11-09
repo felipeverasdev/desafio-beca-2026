@@ -4,11 +4,8 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password:
-<<<<<<< HEAD
-=======
   flyway:
     enabled: false
->>>>>>> feature/ms-user-service-improvement
   jpa:
     hibernate:
       ddl-auto: create-drop

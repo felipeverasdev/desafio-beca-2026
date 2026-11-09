@@ -15,6 +15,7 @@ public class UserSecurityDetails implements UserDetails {
     private final String name;
     private final String email;
     private final String password;
+    private final String role;
     private final boolean active;
 
     public UserSecurityDetails(User user) {
@@ -22,6 +23,7 @@ public class UserSecurityDetails implements UserDetails {
         this.name = user.getName();
         this.email = user.getEmail();
         this.password = user.getPassword();
+        this.role = user.getRole() != null ? user.getRole() : "ROLE_USER";
         this.active = user.getDeletedAt() == null;
     }
 
@@ -33,9 +35,17 @@ public class UserSecurityDetails implements UserDetails {
         return name;
     }
 
+    public String getRole() {
+        return role;
+    }
+
+    public boolean isAdmin() {
+        return "ROLE_ADMIN".equalsIgnoreCase(role) || "admin@beca.com".equalsIgnoreCase(email);
+    }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_USER"));
+        return List.of(new SimpleGrantedAuthority(role != null ? role : "ROLE_USER"));
     }
 
     @Override

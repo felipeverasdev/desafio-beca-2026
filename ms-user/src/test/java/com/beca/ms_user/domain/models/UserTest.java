@@ -38,16 +38,10 @@ class UserTest {
         User user = new User(id, "Lucas Silva", "lucas@email.com", "$2a$10$encodedPasswordHash",
                 "12345678901", "5511987654321", created, created, null);
 
-<<<<<<< HEAD
-        user.updatePersonalData("Lucas S. Atualizado", "5511999998888");
-
-        assertEquals("Lucas S. Atualizado", user.getName());
-=======
         user.updatePersonalData("Lucas S. Atualizado", "lucas.atualizado@email.com", "5511999998888");
 
         assertEquals("Lucas S. Atualizado", user.getName());
         assertEquals("lucas.atualizado@email.com", user.getEmail());
->>>>>>> feature/ms-user-service-improvement
         assertEquals("5511999998888", user.getPhone());
         assertTrue(user.getUpdatedAt().isAfter(created));
     }
@@ -98,6 +92,29 @@ class UserTest {
         assertEquals(now, user.getCreatedAt());
         assertEquals(now, user.getUpdatedAt());
         assertNull(user.getDeletedAt());
+        assertEquals("ROLE_USER", user.getRole());
+    }
+
+    @Test
+    @DisplayName("Deve instanciar corretamente usuário com role personalizada")
+    void shouldInstantiateWithCustomRole() {
+        UUID id = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.now();
+
+        User admin = new User(
+                id,
+                "Admin",
+                "admin@beca.com",
+                "secretHash",
+                "00000000000",
+                "5511900000000",
+                now,
+                now,
+                null,
+                "ROLE_ADMIN"
+        );
+
+        assertEquals("ROLE_ADMIN", admin.getRole());
     }
 }
 

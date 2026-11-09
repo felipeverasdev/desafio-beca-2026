@@ -48,15 +48,22 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
         return repository.findAllByDeletedAtIsNull(pageable).map(this::toDomain);
     }
 
+    @Override
+    public Page<User> findAllDeleted(Pageable pageable) {
+        return repository.findAllByDeletedAtIsNotNull(pageable).map(this::toDomain);
+    }
+
     private User toDomain(UserJpaEntity entity) {
         return new User(entity.getId(), entity.getName(), entity.getEmail(),
                 entity.getPassword(), entity.getCpf(), entity.getPhone(),
-                entity.getCreatedAt(), entity.getUpdatedAt(), entity.getDeletedAt());
+                entity.getCreatedAt(), entity.getUpdatedAt(), entity.getDeletedAt(),
+                entity.getRole());
     }
 
     private UserJpaEntity toEntity(User domain) {
         return new UserJpaEntity(domain.getId(), domain.getName(), domain.getEmail(),
                 domain.getPassword(), domain.getCpf(), domain.getPhone(),
-                domain.getCreatedAt(), domain.getUpdatedAt(), domain.getDeletedAt());
+                domain.getCreatedAt(), domain.getUpdatedAt(), domain.getDeletedAt(),
+                domain.getRole());
     }
 }

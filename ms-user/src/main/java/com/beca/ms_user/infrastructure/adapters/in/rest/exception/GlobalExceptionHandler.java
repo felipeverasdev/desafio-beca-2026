@@ -95,6 +95,20 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(err);
     }
 
+    @ExceptionHandler({org.springframework.dao.InvalidDataAccessApiUsageException.class, org.springframework.data.core.PropertyReferenceException.class})
+    public ResponseEntity<StandardError> invalidDataAccessApiUsage(Exception e, HttpServletRequest request) {
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        StandardError err = new StandardError(
+                Instant.now(),
+                status.value(),
+                "Bad Request",
+                "Parâmetro de ordenação inválido. Os campos válidos para ordenação são: id, name, email, cpf, phone, createdAt.",
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(status).body(err);
+    }
+
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<StandardError> invalidCredentials(InvalidCredentialsException e, HttpServletRequest request) {
         HttpStatus status = HttpStatus.UNAUTHORIZED;

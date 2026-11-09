@@ -79,6 +79,11 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
     }
 
     @Override
+    public Page<User> findAllDeleted(Pageable pageable) {
+        return userRepositoryPort.findAllDeleted(pageable);
+    }
+
+    @Override
     @Transactional
     public User update(UUID id, UpdateUserCommand command) {
         User currentUser = findById(id);
@@ -145,11 +150,7 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
                 }
 
                 String name = columns[0].trim();
-<<<<<<< HEAD
-                String email = columns[1].trim();
-=======
                 String email = columns[1].trim().toLowerCase();
->>>>>>> feature/ms-user-service-improvement
                 String password = columns[2].trim();
                 String cpf = columns[3].trim();
                 String phone = columns[4].trim();

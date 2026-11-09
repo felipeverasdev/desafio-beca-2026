@@ -61,28 +61,28 @@ services:
       timeout: 5s
       retries: 5
 
-  # Microsserviço 2: Gestão Financeira e Transações (a ser descomentado na implementação do MS2)
-  # ms-transaction:
-  #   build:
-  #     context: ./ms-transaction
-  #     dockerfile: Dockerfile
-  #   container_name: ms-transaction
-  #   restart: always
-  #   ports:
-  #     - "${MS_TRANSACTIONS_PORT:-8082}:8082"
-  #   environment:
-  #     - MS_TRANSACTIONS_DB_URL=jdbc:postgresql://transaction-db:5432/transaction_db
-  #     - MS_TRANSACTIONS_DB_USER=${MS_TRANSACTIONS_DB_USER:-transaction_admin}
-  #     - MS_TRANSACTIONS_DB_PASS=${MS_TRANSACTIONS_DB_PASS:-123456}
-  #     - MS_USERS_URL=http://ms-user:8081/api/v1/users
-  #     - SERVER_PORT=8082
-  #   depends_on:
-  #     transaction-db:
-  #       condition: service_healthy
-  #     ms-user:
-  #       condition: service_started
-  #   networks:
-  #     - beca-network
+  # Microsserviço 2: Gestão Financeira e Transações
+  ms-transaction:
+    build:
+      context: ./ms-transaction
+      dockerfile: Dockerfile
+    container_name: ms-transaction
+    restart: always
+    ports:
+      - "${MS_TRANSACTIONS_PORT:-8082}:8082"
+    environment:
+      - MS_TRANSACTIONS_DB_URL=jdbc:postgresql://transaction-db:5432/transaction_db
+      - MS_TRANSACTIONS_DB_USER=${MS_TRANSACTIONS_DB_USER:-transaction_admin}
+      - MS_TRANSACTIONS_DB_PASS=${MS_TRANSACTIONS_DB_PASS:-123456}
+      - MS_USERS_URL=http://ms-user:8081/api/v1/users
+      - SERVER_PORT=8082
+    depends_on:
+      transaction-db:
+        condition: service_healthy
+      ms-user:
+        condition: service_started
+    networks:
+      - beca-network
 
 # Volumes persistentes para não perder dados ao reiniciar containers
 volumes:

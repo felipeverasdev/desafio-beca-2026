@@ -10,6 +10,10 @@ public record UserResponseDTO(
         String cpf,
         String phone,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt
+        OffsetDateTime updatedAt,
+        OffsetDateTime deletedAt
 ) {
+    public UserResponseDTO(UUID id, String name, String email, String cpf, String phone, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
+        this(id, name, email, cpf, phone, createdAt, updatedAt, null);
+    }
 }
