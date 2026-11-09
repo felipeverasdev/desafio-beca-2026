@@ -1,4 +1,0 @@
-com\beca\ms_transaction\application\services\TransactionServiceTest.class
-com\beca\ms_transaction\MsTransactionApplicationTests.class
-com\beca\ms_transaction\domain\models\TransactionTest.class
-com\beca\ms_transaction\application\ports\in\CreateTransactionCommandTest.class
