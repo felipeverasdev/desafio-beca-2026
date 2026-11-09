@@ -13,7 +13,7 @@ Projeto de mentoria e engenharia de software da NTT DATA, **Beca Java - Bradesco
 
 ---
 
-## 🚀 Como Subir o Projeto
+## Como Subir o Projeto
 
 ### Pré-requisitos
 
@@ -68,16 +68,16 @@ Com os containers em execução, acesse as interfaces interativas no navegador:
 - **Rotas Públicas:**
   - Cadastro de usuários: `POST /api/v1/users`
   - Validação de credenciais: `POST /api/v1/users/auth`
+  - Listagem de usuários desativados (Demo/Apresentação): `GET /api/v1/users/deleted`
   - Documentação OpenAPI/Swagger: `/swagger-ui/**`, `/v3/api-docs/**`
 - **Rotas Protegidas:**
   - Todas as demais rotas exigem credenciais válidas cadastradas no banco de dados.
   - Usuários que sofreram exclusão lógica (_soft delete_) têm acesso revogado imediatamente.
   - **Validação de Propriedade (_Ownership Check_):** Nas operações de atualização (`PUT /api/v1/users/{id}`) e remoção (`DELETE /api/v1/users/{id}`), o sistema confere se o usuário autenticado é o titular do identificador informado. Tentativas de alterar ou excluir perfis de terceiros retornam `403 Forbidden`.
-  - **Perfil de Administrador (Demo / Apresentação):** Usuário pré-configurado via migration `admin@beca.com` / `admin123` (`ROLE_ADMIN`). Possui privilégios de bypass no check de propriedade (pode atualizar e excluir qualquer usuário) e acesso exclusivo à visualização de contas desativadas.
 
 ---
 
-## 📡 Endpoints da API
+## Endpoints da API
 
 ### Microsserviço 1: `ms-user` (Porta 8081)
 
@@ -87,11 +87,11 @@ Com os containers em execução, acesse as interfaces interativas no navegador:
 | `POST`   | `/api/v1/users/auth`       | Pública            | Valida credenciais (e-mail e senha) e retorna dados do usuário.        |
 | `POST`   | `/api/v1/users/upload-csv` | Autenticada        | Importação em massa de usuários via upload de arquivo CSV.             |
 | `GET`    | `/api/v1/users`            | Autenticada        | Listagem paginada de usuários ativos (`page`, `size`, `sort`).         |
-| `GET`    | `/api/v1/users/deleted`    | Admin (`ROLE_ADMIN`)| Listagem paginada de usuários excluídos logicamente com `deletedAt`.   |
+| `GET`    | `/api/v1/users/deleted`    | Pública (Demo)     | Listagem paginada de usuários excluídos logicamente com `deletedAt`.   |
 | `GET`    | `/api/v1/users/{id}`       | Autenticada        | Busca os dados cadastrais do usuário por UUID.                         |
 | `GET`    | `/api/v1/users/by-email`   | Autenticada        | Busca o perfil do usuário pelo e-mail (case-insensitive).              |
-| `PUT`    | `/api/v1/users/{id}`       | Autenticada (Dono / Admin) | Atualiza nome, e-mail e celular do usuário.                    |
-| `DELETE` | `/api/v1/users/{id}`       | Autenticada (Dono / Admin) | Realiza exclusão lógica (_soft delete_) do usuário.            |
+| `PUT`    | `/api/v1/users/{id}`       | Autenticada (Dono) | Atualiza nome, e-mail e celular do próprio usuário logado.             |
+| `DELETE` | `/api/v1/users/{id}`       | Autenticada (Dono) | Realiza exclusão lógica (_soft delete_) do próprio usuário logado.    |
 
 #### Exemplo de Payload para Cadastro (`POST /api/v1/users`):
 
@@ -173,7 +173,7 @@ Linhas com dados inválidos ou violação de unicidade (e-mail, CPF ou telefone 
 
 ---
 
-## 🧪 Executando os Testes Unitários
+## Executando os Testes Unitários
 
 Para rodar a suíte completa de testes unitários com cobertura via JaCoCo:
 

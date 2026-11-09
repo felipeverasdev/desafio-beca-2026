@@ -14,17 +14,12 @@ public class User {
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
     private OffsetDateTime deletedAt;
-    private String role;
 
     public User() {
-        this.role = "ROLE_USER";
+
     }
 
     public User(UUID id, String name, String email, String password, String cpf, String phone, OffsetDateTime createdAt, OffsetDateTime updatedAt, OffsetDateTime deletedAt) {
-        this(id, name, email, password, cpf, phone, createdAt, updatedAt, deletedAt, "ROLE_USER");
-    }
-
-    public User(UUID id, String name, String email, String password, String cpf, String phone, OffsetDateTime createdAt, OffsetDateTime updatedAt, OffsetDateTime deletedAt, String role) {
         this.id = id;
         this.name = name;
         this.email = email;
@@ -34,7 +29,6 @@ public class User {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.deletedAt = deletedAt;
-        this.role = (role != null && !role.isBlank()) ? role : "ROLE_USER";
     }
 
     public static User create(String name, String email, String password, String cpf, String phone) {
@@ -47,8 +41,7 @@ public class User {
                 phone,
                 null,
                 null,
-                null,
-                "ROLE_USER"
+                null
         );
     }
 
@@ -98,10 +91,6 @@ public class User {
 
     public OffsetDateTime getDeletedAt() {
         return deletedAt;
-    }
-
-    public String getRole() {
-        return role;
     }
 
 }

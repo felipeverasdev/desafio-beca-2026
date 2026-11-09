@@ -92,29 +92,6 @@ class UserTest {
         assertEquals(now, user.getCreatedAt());
         assertEquals(now, user.getUpdatedAt());
         assertNull(user.getDeletedAt());
-        assertEquals("ROLE_USER", user.getRole());
-    }
-
-    @Test
-    @DisplayName("Deve instanciar corretamente usuário com role personalizada")
-    void shouldInstantiateWithCustomRole() {
-        UUID id = UUID.randomUUID();
-        OffsetDateTime now = OffsetDateTime.now();
-
-        User admin = new User(
-                id,
-                "Admin",
-                "admin@beca.com",
-                "secretHash",
-                "00000000000",
-                "5511900000000",
-                now,
-                now,
-                null,
-                "ROLE_ADMIN"
-        );
-
-        assertEquals("ROLE_ADMIN", admin.getRole());
     }
 }
 

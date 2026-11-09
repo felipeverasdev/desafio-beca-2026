@@ -34,14 +34,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/users").permitAll()
                         // Endpoint de autenticação
                         .requestMatchers(HttpMethod.POST, "/api/v1/users/auth").permitAll()
+                        // Rota de listagem de usuários excluídos pública (para fins de demonstração/apresentação)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/deleted").permitAll()
                         // Documentação Swagger e OpenAPI abertas
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"
                         ).permitAll()
-                        // Rota exclusiva para administrador
-                        .requestMatchers("/api/v1/users/deleted").hasRole("ADMIN")
                         // Todas as demais rotas requerem autenticação (HTTP Basic)
                         .anyRequest().authenticated()
                 )

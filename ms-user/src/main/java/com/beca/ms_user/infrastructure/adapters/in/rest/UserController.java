@@ -220,20 +220,14 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "Listar usuários excluídos do sistema (Apenas Administrador)",
-            description = "Retorna todos os usuários desativados (soft-deleted). Exige autenticação com perfil de administrador.")
+    @Operation(summary = "Listar usuários excluídos do sistema (Demonstração)",
+            description = "Retorna todos os usuários desativados (soft-deleted). Rota pública para fins didáticos e apresentação da entrega.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Lista de usuários deletados retornada com sucesso"),
-            @ApiResponse(responseCode = "403", description = "Acesso negado: apenas administradores podem acessar esta rota")
+            @ApiResponse(responseCode = "200", description = "Lista de usuários deletados retornada com sucesso")
     })
     @GetMapping("/deleted")
     public ResponseEntity<Page<UserResponseDTO>> findDeleted(
-            @ParameterObject @PageableDefault(size = 10) Pageable pageable,
-            @AuthenticationPrincipal UserSecurityDetails authenticatedUser) {
-        if (authenticatedUser == null || !authenticatedUser.isAdmin()) {
-            throw new AccessDeniedException("Apenas administradores podem visualizar usuários excluídos do sistema");
-        }
-
+            @ParameterObject @PageableDefault(size = 10) Pageable pageable) {
         Page<User> deletedUsers = findUserUseCase.findAllDeleted(pageable);
         Page<UserResponseDTO> response = deletedUsers.map(user -> new UserResponseDTO(
                 user.getId(),
@@ -250,13 +244,7 @@ public class UserController {
     }
 
     private void validateOwnership(UserSecurityDetails authenticatedUser, UUID targetId) {
-        if (authenticatedUser == null) {
-            throw new AccessDeniedException("Autenticação necessária");
-        }
-        if (authenticatedUser.isAdmin()) {
-            return;
-        }
-        if (!authenticatedUser.getId().equals(targetId)) {
+        if (authenticatedUser == null || !authenticatedUser.getId().equals(targetId)) {
             throw new AccessDeniedException("Você não tem permissão para alterar ou excluir outro usuário");
         }
     }
