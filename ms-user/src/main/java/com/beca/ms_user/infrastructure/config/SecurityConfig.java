@@ -36,6 +36,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/users/auth").permitAll()
                         // Rota de listagem de usuários excluídos pública (para fins de demonstração/apresentação)
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/deleted").permitAll()
+                        // Consulta de usuário por ID aberta (permite validação inter-serviços pelo ms-transaction)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/{id}").permitAll()
                         // Documentação Swagger e OpenAPI abertas
                         .requestMatchers(
                                 "/v3/api-docs/**",

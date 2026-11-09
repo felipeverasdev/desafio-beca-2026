@@ -68,6 +68,7 @@ Com os containers em execução, acesse as interfaces interativas no navegador:
 - **Rotas Públicas:**
   - Cadastro de usuários: `POST /api/v1/users`
   - Validação de credenciais: `POST /api/v1/users/auth`
+  - Consulta de usuário por ID: `GET /api/v1/users/{id}` (utilizada para validação inter-serviços pelo `ms-transaction`)
   - Listagem de usuários desativados (Demo/Apresentação): `GET /api/v1/users/deleted`
   - Documentação OpenAPI/Swagger: `/swagger-ui/**`, `/v3/api-docs/**`
 - **Rotas Protegidas:**
@@ -109,21 +110,55 @@ Com os containers em execução, acesse as interfaces interativas no navegador:
 
 ### Microsserviço 2: `ms-transaction` (Porta 8082)
 
-| Método | Rota                        | Autenticação       | Descrição                                                                          |
-| :----- | :-------------------------- | :----------------- | :--------------------------------------------------------------------------------- |
-| `POST` | `/api/v1/transactions`      | Autenticada        | Cria e registra uma transação financeira na conta do usuário.                      |
-| `GET`  | `/api/v1/transactions`      | Autenticada        | Busca paginada com filtros por data (`startDate`, `endDate`), `type` e `category`. |
-| `GET`  | `/api/v1/transactions/{id}` | Autenticada (Dono) | Detalha uma transação por ID, garantindo isolamento entre usuários.                |
+| Método | Rota                                   | Autenticação       | Descrição                                                                                                                                           |
+| :----- | :------------------------------------- | :----------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST` | `/api/v1/transactions`                 | Aberta             | Valida usuário no `ms-user`, valida saldo e limites no MockAPI e grava transação (`APPROVED` ou `REJECTED`).                                       |
+| `GET`  | `/api/v1/transactions`                 | Aberta             | Busca paginada com filtros por usuário (`userId`), data (`startDate`, `endDate`) e tipo (`type`).                                                  |
+| `GET`  | `/api/v1/transactions/{id}`            | Aberta / Opcional  | Detalha a transação por ID, enriquecendo a resposta com conversões cambiais para USD e EUR obtidas via **BrasilAPI**.                              |
+| `GET`  | `/api/v1/transactions/balance/{userId}` | Aberta             | Consulta o saldo disponível, limite diário e limite por operação da conta do usuário no serviço autorizador (MockAPI).                              |
 
 #### Exemplo de Payload para Transação (`POST /api/v1/transactions`):
 
 ```json
 {
-  "userId": "801db07e-1ace-4db8-abd8-36cb1d421369",
+  "userId": "57ec4e5d-d49b-46a0-8907-dfd92d215cf5",
   "type": "PURCHASE",
-  "category": "FOOD",
-  "amount": 89.9,
+  "category": "ALIMENTACAO",
+  "amount": 150.0,
   "description": "Almoço de negócios"
+}
+```
+
+#### Exemplo de Resposta Enriquecida com Conversão Cambial (`GET /api/v1/transactions/{id}`):
+
+```json
+{
+  "id": "b840efff-39be-4530-a286-335d611d17cc",
+  "userId": "57ec4e5d-d49b-46a0-8907-dfd92d215cf5",
+  "type": "PURCHASE",
+  "status": "APPROVED",
+  "amount": 150.00,
+  "category": "ALIMENTACAO",
+  "description": "Almoco de negocios",
+  "targetUserId": null,
+  "rejectionReason": null,
+  "createdAt": "2026-11-09T22:55:54.846696Z",
+  "conversions": [
+    {
+      "currency": "USD",
+      "originalAmount": 150.00,
+      "convertedAmount": 27.27,
+      "exchangeRate": 5.5013,
+      "rateDate": "2026-11-08"
+    },
+    {
+      "currency": "EUR",
+      "originalAmount": 150.00,
+      "convertedAmount": 24.46,
+      "exchangeRate": 6.1317,
+      "rateDate": "2026-11-08"
+    }
+  ]
 }
 ```
 
@@ -178,9 +213,9 @@ Linhas com dados inválidos ou violação de unicidade (e-mail, CPF ou telefone 
 Para rodar a suíte completa de testes unitários com cobertura via JaCoCo:
 
 ```bash
-# Testes do microsserviço de usuários (40 testes)
+# Testes do microsserviço de usuários (41 testes)
 cd ms-user && ./mvnw test
 
-# Testes do microsserviço de transações (15 testes)
+# Testes do microsserviço de transações (25 testes)
 cd ../ms-transaction && ./mvnw test
 ```

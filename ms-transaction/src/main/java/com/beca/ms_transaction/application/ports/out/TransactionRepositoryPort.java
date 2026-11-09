@@ -5,6 +5,7 @@ import com.beca.ms_transaction.domain.models.TransactionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -16,5 +17,6 @@ public interface TransactionRepositoryPort {
     Page<Transaction> search(UUID userId, OffsetDateTime startDate, OffsetDateTime endDate,
                              TransactionType type, Pageable pageable);
     List<Transaction> findForAnalysis(UUID userId, OffsetDateTime startDate, OffsetDateTime endDate);
+    BigDecimal sumApprovedOutflowAmountForUserBetween(UUID userId, OffsetDateTime start, OffsetDateTime end);
 }
 

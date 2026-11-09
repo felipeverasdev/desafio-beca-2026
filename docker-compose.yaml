@@ -75,6 +75,7 @@ services:
       - MS_TRANSACTIONS_DB_USER=${MS_TRANSACTIONS_DB_USER:-transaction_admin}
       - MS_TRANSACTIONS_DB_PASS=${MS_TRANSACTIONS_DB_PASS:-123456}
       - MS_USERS_URL=http://ms-user:8081/api/v1/users
+      - MOCKAPI_URL=${MOCKAPI_URL:-https://6af23d8f42c6561ced39234e.mockapi.io/api/v1/transactions/users}
       - SERVER_PORT=8082
     depends_on:
       transaction-db:

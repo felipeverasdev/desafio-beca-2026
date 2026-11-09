@@ -1,14 +1,16 @@
 package com.beca.ms_transaction.application.services;
 
 import com.beca.ms_transaction.application.ports.in.CreateTransactionCommand;
+import com.beca.ms_transaction.application.ports.out.AccountAuthorizationPort;
+import com.beca.ms_transaction.application.ports.out.CurrencyExchangePort;
 import com.beca.ms_transaction.application.ports.out.TransactionRepositoryPort;
+import com.beca.ms_transaction.application.ports.out.UserValidationPort;
+import com.beca.ms_transaction.domain.exceptions.AccountNotFoundException;
+import com.beca.ms_transaction.domain.exceptions.ExternalServiceUnavailableException;
 import com.beca.ms_transaction.domain.exceptions.InvalidTransactionException;
 import com.beca.ms_transaction.domain.exceptions.TransactionNotFoundException;
 import com.beca.ms_transaction.domain.exceptions.UnauthorizedTransactionException;
-import com.beca.ms_transaction.domain.models.Transaction;
-import com.beca.ms_transaction.domain.models.TransactionCategory;
-import com.beca.ms_transaction.domain.models.TransactionStatus;
-import com.beca.ms_transaction.domain.models.TransactionType;
+import com.beca.ms_transaction.domain.models.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +23,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +31,8 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,12 +41,21 @@ class TransactionServiceTest {
     @Mock
     private TransactionRepositoryPort transactionRepositoryPort;
 
+    @Mock
+    private AccountAuthorizationPort accountAuthorizationPort;
+
+    @Mock
+    private UserValidationPort userValidationPort;
+
+    @Mock
+    private CurrencyExchangePort currencyExchangePort;
+
     @InjectMocks
     private TransactionService transactionService;
 
     @Test
-    @DisplayName("Deve criar e salvar transação com sucesso")
-    void shouldCreateAndSaveTransaction() {
+    @DisplayName("Deve criar e salvar depósito com aprovação direta sem consulta de limites")
+    void shouldCreateAndSaveDepositDirectly() {
         UUID userId = UUID.randomUUID();
         CreateTransactionCommand command = new CreateTransactionCommand(
                 userId,
@@ -52,27 +66,201 @@ class TransactionServiceTest {
                 null
         );
 
-        Transaction savedTransaction = new Transaction(
-                UUID.randomUUID(),
-                userId,
-                TransactionType.DEPOSIT,
-                TransactionStatus.APPROVED,
-                new BigDecimal("250.00"),
-                TransactionCategory.OUTROS,
-                "Depósito bancário",
-                null,
-                null,
-                OffsetDateTime.now()
-        );
-
-        when(transactionRepositoryPort.save(any(Transaction.class))).thenReturn(savedTransaction);
+        when(userValidationPort.existsAndActive(userId)).thenReturn(true);
+        when(transactionRepositoryPort.save(any(Transaction.class))).thenAnswer(invocation -> {
+            Transaction t = invocation.getArgument(0);
+            return new Transaction(UUID.randomUUID(), t.getUserId(), t.getType(), t.getStatus(), t.getAmount(), t.getCategory(), t.getDescription(), t.getTargetUserId(), t.getRejectionReason(), OffsetDateTime.now());
+        });
 
         Transaction result = transactionService.execute(command);
 
         assertNotNull(result.getId());
         assertEquals(userId, result.getUserId());
         assertEquals(TransactionStatus.APPROVED, result.getStatus());
+        assertEquals(new BigDecimal("250.00"), result.getAmount());
         verify(transactionRepositoryPort, times(1)).save(any(Transaction.class));
+        verifyNoInteractions(accountAuthorizationPort);
+    }
+
+    @Test
+    @DisplayName("Deve lançar InvalidTransactionException quando usuário originador não existe no ms-user")
+    void shouldThrowWhenOriginUserNotFound() {
+        UUID userId = UUID.randomUUID();
+        CreateTransactionCommand command = new CreateTransactionCommand(
+                userId,
+                TransactionType.DEPOSIT,
+                new BigDecimal("100.00"),
+                TransactionCategory.OUTROS,
+                "Depósito",
+                null
+        );
+
+        when(userValidationPort.existsAndActive(userId)).thenReturn(false);
+
+        InvalidTransactionException ex = assertThrows(InvalidTransactionException.class, () ->
+                transactionService.execute(command));
+        assertTrue(ex.getMessage().contains("não encontrado ou inativo"));
+    }
+
+    @Test
+    @DisplayName("Deve lançar InvalidTransactionException quando destino da transferência não existe")
+    void shouldThrowWhenTransferTargetUserNotFound() {
+        UUID userId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        CreateTransactionCommand command = new CreateTransactionCommand(
+                userId,
+                TransactionType.TRANSFER,
+                new BigDecimal("50.00"),
+                TransactionCategory.OUTROS,
+                "Pix",
+                targetId
+        );
+
+        when(userValidationPort.existsAndActive(userId)).thenReturn(true);
+        when(userValidationPort.existsAndActive(targetId)).thenReturn(false);
+
+        InvalidTransactionException ex = assertThrows(InvalidTransactionException.class, () ->
+                transactionService.execute(command));
+        assertTrue(ex.getMessage().contains("destinatário não encontrado"));
+    }
+
+    @Test
+    @DisplayName("Deve lançar InvalidTransactionException ao transferir para a própria conta")
+    void shouldThrowWhenTransferToSameAccount() {
+        UUID userId = UUID.randomUUID();
+
+        InvalidTransactionException ex = assertThrows(InvalidTransactionException.class, () ->
+                new CreateTransactionCommand(
+                        userId,
+                        TransactionType.TRANSFER,
+                        new BigDecimal("50.00"),
+                        TransactionCategory.OUTROS,
+                        "Pix",
+                        userId
+                ));
+        assertTrue(ex.getMessage().contains("mesma conta"));
+    }
+
+    @Test
+    @DisplayName("Deve aprovar compra quando saldo e limites forem suficientes (KAN-9)")
+    void shouldApprovePurchaseWhenLimitsAndBalanceAreSufficient() {
+        UUID userId = UUID.randomUUID();
+        CreateTransactionCommand command = new CreateTransactionCommand(
+                userId,
+                TransactionType.PURCHASE,
+                new BigDecimal("150.00"),
+                TransactionCategory.ALIMENTACAO,
+                "Mercado",
+                null
+        );
+
+        AccountBalance balance = new AccountBalance(userId, new BigDecimal("1000.00"), new BigDecimal("500.00"), new BigDecimal("300.00"));
+        when(userValidationPort.existsAndActive(userId)).thenReturn(true);
+        when(accountAuthorizationPort.findAccountBalance(userId)).thenReturn(Optional.of(balance));
+        when(transactionRepositoryPort.sumApprovedOutflowAmountForUserBetween(eq(userId), any(), any())).thenReturn(new BigDecimal("100.00"));
+        when(transactionRepositoryPort.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Transaction result = transactionService.execute(command);
+
+        assertEquals(TransactionStatus.APPROVED, result.getStatus());
+        assertNull(result.getRejectionReason());
+        assertEquals(new BigDecimal("150.00"), result.getAmount());
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar transação quando valor exceder limite por transação (KAN-9)")
+    void shouldRejectWhenExceedsTransactionLimit() {
+        UUID userId = UUID.randomUUID();
+        CreateTransactionCommand command = new CreateTransactionCommand(
+                userId,
+                TransactionType.PURCHASE,
+                new BigDecimal("350.00"),
+                TransactionCategory.ALIMENTACAO,
+                "Mercado",
+                null
+        );
+
+        AccountBalance balance = new AccountBalance(userId, new BigDecimal("1000.00"), new BigDecimal("500.00"), new BigDecimal("300.00"));
+        when(userValidationPort.existsAndActive(userId)).thenReturn(true);
+        when(accountAuthorizationPort.findAccountBalance(userId)).thenReturn(Optional.of(balance));
+        when(transactionRepositoryPort.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Transaction result = transactionService.execute(command);
+
+        assertEquals(TransactionStatus.REJECTED, result.getStatus());
+        assertTrue(result.getRejectionReason().contains("excede o limite por transação permitido"));
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar transação quando valor acumulado no dia exceder limite diário (KAN-9)")
+    void shouldRejectWhenExceedsDailyLimit() {
+        UUID userId = UUID.randomUUID();
+        CreateTransactionCommand command = new CreateTransactionCommand(
+                userId,
+                TransactionType.PURCHASE,
+                new BigDecimal("150.00"),
+                TransactionCategory.ALIMENTACAO,
+                "Mercado",
+                null
+        );
+
+        AccountBalance balance = new AccountBalance(userId, new BigDecimal("1000.00"), new BigDecimal("500.00"), new BigDecimal("300.00"));
+        when(userValidationPort.existsAndActive(userId)).thenReturn(true);
+        when(accountAuthorizationPort.findAccountBalance(userId)).thenReturn(Optional.of(balance));
+        when(transactionRepositoryPort.sumApprovedOutflowAmountForUserBetween(eq(userId), any(), any())).thenReturn(new BigDecimal("400.00"));
+        when(transactionRepositoryPort.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Transaction result = transactionService.execute(command);
+
+        assertEquals(TransactionStatus.REJECTED, result.getStatus());
+        assertTrue(result.getRejectionReason().contains("excede o limite diário"));
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar transação quando saldo em conta for insuficiente (KAN-9)")
+    void shouldRejectWhenBalanceInsufficient() {
+        UUID userId = UUID.randomUUID();
+        CreateTransactionCommand command = new CreateTransactionCommand(
+                userId,
+                TransactionType.WITHDRAWAL,
+                new BigDecimal("250.00"),
+                TransactionCategory.OUTROS,
+                "Saque 24h",
+                null
+        );
+
+        AccountBalance balance = new AccountBalance(userId, new BigDecimal("100.00"), new BigDecimal("500.00"), new BigDecimal("300.00"));
+        when(userValidationPort.existsAndActive(userId)).thenReturn(true);
+        when(accountAuthorizationPort.findAccountBalance(userId)).thenReturn(Optional.of(balance));
+        when(transactionRepositoryPort.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Transaction result = transactionService.execute(command);
+
+        assertEquals(TransactionStatus.REJECTED, result.getStatus());
+        assertTrue(result.getRejectionReason().contains("Saldo insuficiente para realizar a transação"));
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar transação quando MockAPI estiver fora do ar (KAN-9)")
+    void shouldRejectWhenMockApiUnavailable() {
+        UUID userId = UUID.randomUUID();
+        CreateTransactionCommand command = new CreateTransactionCommand(
+                userId,
+                TransactionType.PURCHASE,
+                new BigDecimal("50.00"),
+                TransactionCategory.ALIMENTACAO,
+                "Padaria",
+                null
+        );
+
+        when(userValidationPort.existsAndActive(userId)).thenReturn(true);
+        when(accountAuthorizationPort.findAccountBalance(userId)).thenThrow(new ExternalServiceUnavailableException("Timeout MockAPI"));
+        when(transactionRepositoryPort.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Transaction result = transactionService.execute(command);
+
+        assertEquals(TransactionStatus.REJECTED, result.getStatus());
+        assertEquals("Serviço autorizador indisponível no momento", result.getRejectionReason());
     }
 
     @Test
@@ -106,19 +294,28 @@ class TransactionServiceTest {
     }
 
     @Test
-    @DisplayName("Deve buscar transação por ID com sucesso para usuário autorizado")
-    void shouldGetTransactionByIdWhenAuthorized() {
+    @DisplayName("Deve buscar transação por ID com conversões de moeda (KAN-10 & KAN-11)")
+    void shouldGetTransactionByIdWithConversionsWhenAuthorized() {
         UUID txId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         Transaction tx = new Transaction(txId, userId, TransactionType.PURCHASE, TransactionStatus.APPROVED,
-                BigDecimal.TEN, TransactionCategory.ALIMENTACAO, "Lanche", null, null, OffsetDateTime.now());
+                new BigDecimal("100.00"), TransactionCategory.ALIMENTACAO, "Lanche", null, null, OffsetDateTime.now());
 
         when(transactionRepositoryPort.findById(txId)).thenReturn(Optional.of(tx));
+        when(currencyExchangePort.getQuote(eq("USD"), any())).thenReturn(Optional.of(new CurrencyQuote("USD", new BigDecimal("5.00"), LocalDate.now())));
+        when(currencyExchangePort.getQuote(eq("EUR"), any())).thenReturn(Optional.of(new CurrencyQuote("EUR", new BigDecimal("6.00"), LocalDate.now())));
 
-        Transaction result = transactionService.execute(txId, userId);
+        TransactionDetails result = transactionService.execute(txId, userId);
 
-        assertEquals(txId, result.getId());
-        assertEquals(userId, result.getUserId());
+        assertNotNull(result);
+        assertEquals(txId, result.transaction().getId());
+        assertEquals(2, result.conversions().size());
+
+        CurrencyConversion usd = result.conversions().stream().filter(c -> c.currency().equals("USD")).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("20.00"), usd.convertedAmount());
+
+        CurrencyConversion eur = result.conversions().stream().filter(c -> c.currency().equals("EUR")).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("16.67"), eur.convertedAmount());
     }
 
     @Test
@@ -146,5 +343,32 @@ class TransactionServiceTest {
         assertThrows(UnauthorizedTransactionException.class, () ->
                 transactionService.execute(txId, strangerId));
     }
-}
 
+    @Test
+    @DisplayName("Deve consultar saldo do usuário na MockAPI com sucesso (GetAccountBalanceUseCase)")
+    void shouldGetAccountBalanceSuccessfully() {
+        UUID userId = UUID.randomUUID();
+        AccountBalance balance = new AccountBalance(userId, new BigDecimal("2500.00"), new BigDecimal("1000.00"), new BigDecimal("500.00"));
+
+        when(userValidationPort.existsAndActive(userId)).thenReturn(true);
+        when(accountAuthorizationPort.findAccountBalance(userId)).thenReturn(Optional.of(balance));
+
+        AccountBalance result = transactionService.execute(userId);
+
+        assertNotNull(result);
+        assertEquals(userId, result.userId());
+        assertEquals(new BigDecimal("2500.00"), result.balance());
+    }
+
+    @Test
+    @DisplayName("Deve lançar AccountNotFoundException ao consultar saldo de conta inexistente")
+    void shouldThrowAccountNotFoundExceptionWhenBalanceNotFound() {
+        UUID userId = UUID.randomUUID();
+
+        when(userValidationPort.existsAndActive(userId)).thenReturn(true);
+        when(accountAuthorizationPort.findAccountBalance(userId)).thenReturn(Optional.empty());
+
+        assertThrows(AccountNotFoundException.class, () ->
+                transactionService.execute(userId));
+    }
+}

@@ -2,6 +2,7 @@ package com.beca.ms_transaction.infrastructure.adapters.out.persistence;
 
 import com.beca.ms_transaction.application.ports.out.TransactionRepositoryPort;
 import com.beca.ms_transaction.domain.models.Transaction;
+import com.beca.ms_transaction.domain.models.TransactionStatus;
 import com.beca.ms_transaction.domain.models.TransactionType;
 import com.beca.ms_transaction.infrastructure.adapters.out.persistence.entity.TransactionJpaEntity;
 import com.beca.ms_transaction.infrastructure.adapters.out.persistence.repository.SpringDataTransactionRepository;
@@ -11,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -50,6 +52,16 @@ public class TransactionRepositoryAdapter implements TransactionRepositoryPort {
         return repository.findAll(spec).stream()
                 .map(this::toDomain)
                 .toList();
+    }
+
+    @Override
+    public BigDecimal sumApprovedOutflowAmountForUserBetween(UUID userId, OffsetDateTime start, OffsetDateTime end) {
+        List<TransactionType> outflowTypes = List.of(
+                TransactionType.WITHDRAWAL,
+                TransactionType.TRANSFER,
+                TransactionType.PURCHASE
+        );
+        return repository.sumOutflows(userId, TransactionStatus.APPROVED, outflowTypes, start, end);
     }
 
     private Transaction toDomain(TransactionJpaEntity entity) {
