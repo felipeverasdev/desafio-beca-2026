@@ -32,7 +32,7 @@ docker compose up -d
 O comando irá:
 
 1. Subir os bancos de dados PostgreSQL (`user-db` e `transaction-db`) com healthchecks automatizados.
-2. Executar as migrations do Flyway (`V1__create_users_table.sql`) garantindo tabelas e índices parciais de unicidade.
+2. Executar as migrations do Flyway (`V1__create_users_table.sql` no `ms-user` e `V1__create_transactions_table.sql` no `ms-transaction`) garantindo tabelas e índices otimizados.
 3. Construir e iniciar os microsserviços `ms-user` e `ms-transaction` na rede compartilhada `beca-network`.
 
 ### Comandos Úteis
