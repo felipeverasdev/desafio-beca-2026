@@ -33,7 +33,7 @@ public class MsUserValidationAdapter implements UserValidationPort {
 
         try {
             return restClient.get()
-                    .uri(msUsersUrl + "/{id}", userId)
+                    .uri(msUsersUrl + "/{id}/exists", userId)
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, resp) -> {
                         log.debug("ms-user retornou {} para userId {}", resp.getStatusCode(), userId);

@@ -30,14 +30,12 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Cadastro de usuário aberto ao público (conforme solicitação do PO / Review)
+                        // Cadastro de usuário aberto ao público
                         .requestMatchers(HttpMethod.POST, "/api/v1/users").permitAll()
                         // Endpoint de autenticação
                         .requestMatchers(HttpMethod.POST, "/api/v1/users/auth").permitAll()
-                        // Rota de listagem de usuários excluídos pública (para fins de demonstração/apresentação)
-                        .requestMatchers(HttpMethod.GET, "/api/v1/users/deleted").permitAll()
-                        // Consulta de usuário por ID aberta (permite validação inter-serviços pelo ms-transaction)
-                        .requestMatchers(HttpMethod.GET, "/api/v1/users/{id}").permitAll()
+                        // Validação de existência inter-serviços (sem dados sensíveis)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/{id}/exists").permitAll()
                         // Documentação Swagger e OpenAPI abertas
                         .requestMatchers(
                                 "/v3/api-docs/**",

@@ -68,13 +68,12 @@ Com os containers em execução, acesse as interfaces interativas no navegador:
 - **Rotas Públicas:**
   - Cadastro de usuários: `POST /api/v1/users`
   - Validação de credenciais: `POST /api/v1/users/auth`
-  - Consulta de usuário por ID: `GET /api/v1/users/{id}` (utilizada para validação inter-serviços pelo `ms-transaction`)
-  - Listagem de usuários desativados (Demo/Apresentação): `GET /api/v1/users/deleted`
+  - Verificação de existência inter-serviços: `GET /api/v1/users/{id}/exists` (sem dados sensíveis)
   - Documentação OpenAPI/Swagger: `/swagger-ui/**`, `/v3/api-docs/**`
 - **Rotas Protegidas:**
   - Todas as demais rotas exigem credenciais válidas cadastradas no banco de dados.
   - Usuários que sofreram exclusão lógica (_soft delete_) têm acesso revogado imediatamente.
-  - **Validação de Propriedade (_Ownership Check_):** Nas operações de atualização (`PUT /api/v1/users/{id}`) e remoção (`DELETE /api/v1/users/{id}`), o sistema confere se o usuário autenticado é o titular do identificador informado. Tentativas de alterar ou excluir perfis de terceiros retornam `403 Forbidden`.
+  - **Validação de Propriedade (_Ownership Check_):** Nas operações de consulta por ID (`GET /api/v1/users/{id}`), consulta por e-mail (`GET /api/v1/users/by-email`), atualização (`PUT /api/v1/users/{id}`) e remoção (`DELETE /api/v1/users/{id}`), o sistema confere se o usuário autenticado é o titular do identificador ou do e-mail informado. Tentativas de consultar, alterar ou excluir perfis de terceiros retornam `403 Forbidden`.
 
 ---
 
@@ -86,11 +85,12 @@ Com os containers em execução, acesse as interfaces interativas no navegador:
 | :------- | :------------------------- | :----------------- | :--------------------------------------------------------------------- |
 | `POST`   | `/api/v1/users`            | Pública            | Cadastra um novo usuário no sistema.                                   |
 | `POST`   | `/api/v1/users/auth`       | Pública            | Valida credenciais (e-mail e senha) e retorna dados do usuário.        |
+| `GET`    | `/api/v1/users/{id}/exists`| Pública            | Validação rápida de existência de usuário (sem dados sensíveis).      |
 | `POST`   | `/api/v1/users/upload-csv` | Autenticada        | Importação em massa de usuários via upload de arquivo CSV.             |
 | `GET`    | `/api/v1/users`            | Autenticada        | Listagem paginada de usuários ativos (`page`, `size`, `sort`).         |
-| `GET`    | `/api/v1/users/deleted`    | Pública (Demo)     | Listagem paginada de usuários excluídos logicamente com `deletedAt`.   |
-| `GET`    | `/api/v1/users/{id}`       | Autenticada        | Busca os dados cadastrais do usuário por UUID.                         |
-| `GET`    | `/api/v1/users/by-email`   | Autenticada        | Busca o perfil do usuário pelo e-mail (case-insensitive).              |
+| `GET`    | `/api/v1/users/deleted`    | Autenticada        | Listagem paginada de usuários excluídos logicamente com `deletedAt`.   |
+| `GET`    | `/api/v1/users/{id}`       | Autenticada (Dono) | Busca os dados cadastrais do próprio usuário por UUID.                 |
+| `GET`    | `/api/v1/users/by-email`   | Autenticada (Dono) | Busca o próprio perfil do usuário pelo e-mail (case-insensitive).      |
 | `PUT`    | `/api/v1/users/{id}`       | Autenticada (Dono) | Atualiza nome, e-mail e celular do próprio usuário logado.             |
 | `DELETE` | `/api/v1/users/{id}`       | Autenticada (Dono) | Realiza exclusão lógica (_soft delete_) do próprio usuário logado.    |
 

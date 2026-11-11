@@ -87,5 +87,17 @@ class CreateUserCommandTest {
         assertThrows(IllegalArgumentException.class, () ->
                 new CreateUserCommand("Carlos", "email@email.com", "senha123", "12345678901", "5511887654321"));
     }
+
+    @Test
+    @DisplayName("Deve lançar exceção quando o nome ou email exceder 150 caracteres")
+    void shouldThrowExceptionWhenNameOrEmailExceeds150Chars() {
+        String longName = "A".repeat(151);
+        String longEmail = "a".repeat(140) + "@domain.com"; // 151 chars
+
+        assertThrows(IllegalArgumentException.class, () ->
+                new CreateUserCommand(longName, "carlos@email.com", "senha123", "12345678901", "5511987654321"));
+        assertThrows(IllegalArgumentException.class, () ->
+                new CreateUserCommand("Carlos", longEmail, "senha123", "12345678901", "5511987654321"));
+    }
 }
 
