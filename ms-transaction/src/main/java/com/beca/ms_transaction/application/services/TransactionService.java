@@ -15,6 +15,8 @@ import com.beca.ms_transaction.domain.exceptions.InvalidTransactionException;
 import com.beca.ms_transaction.domain.exceptions.TransactionNotFoundException;
 import com.beca.ms_transaction.domain.exceptions.UnauthorizedTransactionException;
 import com.beca.ms_transaction.domain.models.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -22,6 +24,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +32,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 public class TransactionService implements CreateTransactionUseCase, SearchTransactionsUseCase, GetTransactionByIdUseCase, GetAccountBalanceUseCase {
+
+    private static final Logger log = LoggerFactory.getLogger(TransactionService.class);
+    private static final ZoneId ZONE_SP = ZoneId.of("America/Sao_Paulo");
 
     private final TransactionRepositoryPort transactionRepositoryPort;
     private final AccountAuthorizationPort accountAuthorizationPort;
@@ -206,7 +212,9 @@ public class TransactionService implements CreateTransactionUseCase, SearchTrans
             throw new UnauthorizedTransactionException("Você não tem permissão para acessar esta transação");
         }
 
-        LocalDate txDate = transaction.getCreatedAt() != null ? transaction.getCreatedAt().toLocalDate() : LocalDate.now();
+        LocalDate txDate = transaction.getCreatedAt() != null
+                ? transaction.getCreatedAt().atZoneSameInstant(ZONE_SP).toLocalDate()
+                : LocalDate.now(ZONE_SP);
         List<CurrencyConversion> conversions = getConversionsForAmount(transaction.getAmount(), txDate);
 
         return new TransactionDetails(transaction, conversions);
@@ -230,23 +238,27 @@ public class TransactionService implements CreateTransactionUseCase, SearchTrans
             return List.of();
         }
 
-        LocalDate targetDate = (date != null) ? date : LocalDate.now();
+        LocalDate targetDate = (date != null) ? date : LocalDate.now(ZONE_SP);
         List<CurrencyConversion> conversions = new ArrayList<>();
 
         for (String currency : List.of("USD", "EUR")) {
-            Optional<CurrencyQuote> quoteOpt = currencyExchangePort.getQuote(currency, targetDate);
-            if (quoteOpt.isPresent()) {
-                CurrencyQuote quote = quoteOpt.get();
-                if (quote.rate() != null && quote.rate().compareTo(BigDecimal.ZERO) > 0) {
-                    BigDecimal converted = amountInBrl.divide(quote.rate(), 2, RoundingMode.HALF_UP);
-                    conversions.add(new CurrencyConversion(
-                            currency,
-                            amountInBrl,
-                            converted,
-                            quote.rate(),
-                            quote.quoteDate()
-                    ));
+            try {
+                Optional<CurrencyQuote> quoteOpt = currencyExchangePort.getQuote(currency, targetDate);
+                if (quoteOpt.isPresent()) {
+                    CurrencyQuote quote = quoteOpt.get();
+                    if (quote.rate() != null && quote.rate().compareTo(BigDecimal.ZERO) > 0) {
+                        BigDecimal converted = amountInBrl.divide(quote.rate(), 2, RoundingMode.HALF_UP);
+                        conversions.add(new CurrencyConversion(
+                                currency,
+                                amountInBrl,
+                                converted,
+                                quote.rate(),
+                                quote.quoteDate()
+                        ));
+                    }
                 }
+            } catch (Exception ex) {
+                log.warn("Falha ao obter cotação de câmbio para {} (data {}): {}", currency, targetDate, ex.getMessage());
             }
         }
 

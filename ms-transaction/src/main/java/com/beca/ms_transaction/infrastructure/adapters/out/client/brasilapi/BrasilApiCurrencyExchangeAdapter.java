@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
@@ -20,6 +21,7 @@ public class BrasilApiCurrencyExchangeAdapter implements CurrencyExchangePort {
 
     private static final Logger log = LoggerFactory.getLogger(BrasilApiCurrencyExchangeAdapter.class);
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final ZoneId ZONE_SP = ZoneId.of("America/Sao_Paulo");
 
     private final RestClient restClient;
     private final String brasilApiBaseUrl;
@@ -37,8 +39,16 @@ public class BrasilApiCurrencyExchangeAdapter implements CurrencyExchangePort {
             return Optional.empty();
         }
 
+        LocalDate today = LocalDate.now(ZONE_SP);
         LocalDate targetDate = date;
-        // Permite recuar até 5 dias para contornar finais de semana e feriados bancários
+
+        // Regra do PO: Se a data da transação for hoje ou futura, consulta o dia anterior
+        // (a BrasilAPI retorna 400 NO_TODAY_DATE ao consultar a data do dia atual)
+        if (!targetDate.isBefore(today)) {
+            targetDate = today.minusDays(1);
+        }
+
+        // Permite recuar até 5 dias para contornar feriados bancários e fins de semana
         for (int attempts = 0; attempts < 5; attempts++) {
             Optional<CurrencyQuote> quote = fetchQuoteForDate(currency, targetDate);
             if (quote.isPresent()) {
@@ -74,10 +84,26 @@ public class BrasilApiCurrencyExchangeAdapter implements CurrencyExchangePort {
                 return Optional.empty();
             }
 
+            // Regra do PO: Usa a data que vem na resposta como data da cotação (ex.: fim de semana devolve sexta)
+            LocalDate quoteDate = date;
+            if (response.data() != null && !response.data().isBlank()) {
+                try {
+                    quoteDate = LocalDate.parse(response.data().trim(), DATE_FORMATTER);
+                } catch (Exception ex) {
+                    log.debug("Falha ao parsear response.data ({}), mantendo targetDate", response.data());
+                }
+            } else if (latest.dataHoraCotacao() != null && latest.dataHoraCotacao().length() >= 10) {
+                try {
+                    quoteDate = LocalDate.parse(latest.dataHoraCotacao().substring(0, 10), DATE_FORMATTER);
+                } catch (Exception ex) {
+                    log.debug("Falha ao parsear latest.dataHoraCotacao ({}), mantendo targetDate", latest.dataHoraCotacao());
+                }
+            }
+
             return Optional.of(new CurrencyQuote(
                     currency.toUpperCase(),
                     latest.cotacaoVenda(),
-                    date
+                    quoteDate
             ));
 
         } catch (Exception ex) {
