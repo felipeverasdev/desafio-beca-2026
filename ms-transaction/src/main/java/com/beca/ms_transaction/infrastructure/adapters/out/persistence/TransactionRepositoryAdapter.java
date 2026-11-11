@@ -55,6 +55,14 @@ public class TransactionRepositoryAdapter implements TransactionRepositoryPort {
     }
 
     @Override
+    public List<Transaction> findAllByFilters(UUID userId, OffsetDateTime startDate, OffsetDateTime endDate, TransactionType type) {
+        Specification<TransactionJpaEntity> spec = TransactionSpecifications.withFilters(userId, startDate, endDate, type);
+        return repository.findAll(spec).stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
     public BigDecimal sumApprovedOutflowAmountForUserBetween(UUID userId, OffsetDateTime start, OffsetDateTime end) {
         List<TransactionType> outflowTypes = List.of(
                 TransactionType.WITHDRAWAL,

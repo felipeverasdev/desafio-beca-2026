@@ -116,6 +116,8 @@ Com os containers em execução, acesse as interfaces interativas no navegador:
 | `GET`  | `/api/v1/transactions`                 | Aberta             | Busca paginada com filtros por usuário (`userId`), data (`startDate`, `endDate`) e tipo (`type`).                                                  |
 | `GET`  | `/api/v1/transactions/{id}`            | Aberta / Opcional  | Detalha a transação por ID, enriquecendo a resposta com conversões cambiais para USD e EUR obtidas via **BrasilAPI**.                              |
 | `GET`  | `/api/v1/transactions/balance/{userId}` | Aberta             | Consulta o saldo disponível, limite diário e limite por operação da conta do usuário no serviço autorizador (MockAPI).                              |
+| `GET`  | `/api/v1/transactions/analysis`        | Aberta             | Análise de despesas (saídas aprovadas: compras, saques e transferências) com totais e percentuais por categoria, dia e mês (padrão: mês atual).     |
+| `GET`  | `/api/v1/transactions/export-csv`      | Aberta             | Exportação do extrato/relatório de transações em CSV para Excel pt-BR (delimitador `;`, `R$ 1.234,56`, `dd/MM/yyyy HH:mm:ss` e UTF-8 BOM).        |
 
 #### Exemplo de Payload para Transação (`POST /api/v1/transactions`):
 
@@ -216,6 +218,6 @@ Para rodar a suíte completa de testes unitários com cobertura via JaCoCo:
 # Testes do microsserviço de usuários (41 testes)
 cd ms-user && ./mvnw test
 
-# Testes do microsserviço de transações (25 testes)
+# Testes do microsserviço de transações (32 testes)
 cd ../ms-transaction && ./mvnw test
 ```

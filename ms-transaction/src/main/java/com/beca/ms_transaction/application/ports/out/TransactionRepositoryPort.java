@@ -17,6 +17,7 @@ public interface TransactionRepositoryPort {
     Page<Transaction> search(UUID userId, OffsetDateTime startDate, OffsetDateTime endDate,
                              TransactionType type, Pageable pageable);
     List<Transaction> findForAnalysis(UUID userId, OffsetDateTime startDate, OffsetDateTime endDate);
+    List<Transaction> findAllByFilters(UUID userId, OffsetDateTime startDate, OffsetDateTime endDate, TransactionType type);
     BigDecimal sumApprovedOutflowAmountForUserBetween(UUID userId, OffsetDateTime start, OffsetDateTime end);
 }
 

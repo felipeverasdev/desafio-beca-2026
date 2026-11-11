@@ -1,7 +1,9 @@
 package com.beca.ms_transaction.application.services;
 
+import com.beca.ms_transaction.application.ports.in.AnalyzeExpensesUseCase;
 import com.beca.ms_transaction.application.ports.in.CreateTransactionCommand;
 import com.beca.ms_transaction.application.ports.in.CreateTransactionUseCase;
+import com.beca.ms_transaction.application.ports.in.ExportTransactionsCsvUseCase;
 import com.beca.ms_transaction.application.ports.in.GetAccountBalanceUseCase;
 import com.beca.ms_transaction.application.ports.in.GetTransactionByIdUseCase;
 import com.beca.ms_transaction.application.ports.in.SearchTransactionsUseCase;
@@ -20,21 +22,28 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.time.temporal.TemporalAdjusters;
+import java.util.*;
+import java.util.stream.Collectors;
 
-public class TransactionService implements CreateTransactionUseCase, SearchTransactionsUseCase, GetTransactionByIdUseCase, GetAccountBalanceUseCase {
+public class TransactionService implements CreateTransactionUseCase, SearchTransactionsUseCase, GetTransactionByIdUseCase, GetAccountBalanceUseCase, AnalyzeExpensesUseCase, ExportTransactionsCsvUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(TransactionService.class);
     private static final ZoneId ZONE_SP = ZoneId.of("America/Sao_Paulo");
+    private static final DateTimeFormatter CSV_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
 
     private final TransactionRepositoryPort transactionRepositoryPort;
     private final AccountAuthorizationPort accountAuthorizationPort;
@@ -263,5 +272,169 @@ public class TransactionService implements CreateTransactionUseCase, SearchTrans
         }
 
         return conversions;
+    }
+
+    @Override
+    public ExpenseAnalysis execute(UUID userId, LocalDate startDate, LocalDate endDate) {
+        if (userId == null) {
+            throw new InvalidTransactionException("O ID do usuário é obrigatório para a análise de despesas");
+        }
+        if (!userValidationPort.existsAndActive(userId)) {
+            throw new InvalidTransactionException("Usuário não encontrado ou inativo no sistema. ID: " + userId);
+        }
+
+        LocalDate effectiveStart = startDate;
+        LocalDate effectiveEnd = endDate;
+
+        // Regra do PO: Período padrão, quando não informado: o mês atual.
+        LocalDate today = LocalDate.now(ZONE_SP);
+        if (effectiveStart == null && effectiveEnd == null) {
+            effectiveStart = today.withDayOfMonth(1);
+            effectiveEnd = today.with(TemporalAdjusters.lastDayOfMonth());
+        } else if (effectiveStart == null) {
+            effectiveStart = effectiveEnd.withDayOfMonth(1);
+        } else if (effectiveEnd == null) {
+            effectiveEnd = effectiveStart.with(TemporalAdjusters.lastDayOfMonth());
+        }
+
+        if (effectiveStart.isAfter(effectiveEnd)) {
+            throw new InvalidTransactionException("A data inicial não pode ser posterior à data final");
+        }
+
+        OffsetDateTime startDateTime = effectiveStart.atStartOfDay(ZONE_SP).toOffsetDateTime();
+        OffsetDateTime endDateTime = effectiveEnd.atTime(23, 59, 59, 999999999).atZone(ZONE_SP).toOffsetDateTime();
+
+        List<Transaction> transactions = transactionRepositoryPort.findForAnalysis(userId, startDateTime, endDateTime);
+
+        BigDecimal totalExpenses = transactions.stream()
+                .map(Transaction::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Agrupamento por Categoria (ordenado por maior gasto)
+        Map<TransactionCategory, List<Transaction>> byCategoryMap = transactions.stream()
+                .collect(Collectors.groupingBy(t -> t.getCategory() != null ? t.getCategory() : TransactionCategory.OUTROS));
+
+        List<ExpenseAnalysis.CategoryExpenseSummary> categorySummaries = byCategoryMap.entrySet().stream()
+                .map(entry -> {
+                    TransactionCategory category = entry.getKey();
+                    BigDecimal categoryTotal = entry.getValue().stream()
+                            .map(Transaction::getAmount)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal percentage = totalExpenses.compareTo(BigDecimal.ZERO) > 0
+                            ? categoryTotal.multiply(new BigDecimal("100")).divide(totalExpenses, 2, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO;
+                    return new ExpenseAnalysis.CategoryExpenseSummary(category, categoryTotal, percentage, entry.getValue().size());
+                })
+                .sorted((a, b) -> b.totalAmount().compareTo(a.totalAmount()))
+                .toList();
+
+        // Agrupamento por Dia (ordem cronológica)
+        Map<LocalDate, List<Transaction>> byDayMap = transactions.stream()
+                .collect(Collectors.groupingBy(t -> t.getCreatedAt().atZoneSameInstant(ZONE_SP).toLocalDate()));
+
+        List<ExpenseAnalysis.DailyExpenseSummary> dailySummaries = byDayMap.entrySet().stream()
+                .map(entry -> {
+                    BigDecimal dayTotal = entry.getValue().stream()
+                            .map(Transaction::getAmount)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    return new ExpenseAnalysis.DailyExpenseSummary(entry.getKey(), dayTotal, entry.getValue().size());
+                })
+                .sorted(Comparator.comparing(ExpenseAnalysis.DailyExpenseSummary::date))
+                .toList();
+
+        // Agrupamento por Mês (ordem cronológica "YYYY-MM")
+        Map<String, List<Transaction>> byMonthMap = transactions.stream()
+                .collect(Collectors.groupingBy(t -> {
+                    LocalDate d = t.getCreatedAt().atZoneSameInstant(ZONE_SP).toLocalDate();
+                    return String.format("%04d-%02d", d.getYear(), d.getMonthValue());
+                }));
+
+        List<ExpenseAnalysis.MonthlyExpenseSummary> monthlySummaries = byMonthMap.entrySet().stream()
+                .map(entry -> {
+                    BigDecimal monthTotal = entry.getValue().stream()
+                            .map(Transaction::getAmount)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    return new ExpenseAnalysis.MonthlyExpenseSummary(entry.getKey(), monthTotal, entry.getValue().size());
+                })
+                .sorted(Comparator.comparing(ExpenseAnalysis.MonthlyExpenseSummary::yearMonth))
+                .toList();
+
+        return new ExpenseAnalysis(
+                userId,
+                effectiveStart,
+                effectiveEnd,
+                totalExpenses,
+                transactions.size(),
+                categorySummaries,
+                dailySummaries,
+                monthlySummaries
+        );
+    }
+
+    @Override
+    public byte[] execute(UUID userId, LocalDate startDate, LocalDate endDate, TransactionType type) {
+        if (userId == null) {
+            throw new InvalidTransactionException("O ID do usuário é obrigatório para exportar o relatório");
+        }
+        if (!userValidationPort.existsAndActive(userId)) {
+            throw new InvalidTransactionException("Usuário não encontrado ou inativo no sistema. ID: " + userId);
+        }
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new InvalidTransactionException("A data inicial não pode ser posterior à data final");
+        }
+
+        OffsetDateTime startDateTime = startDate != null ? startDate.atStartOfDay(ZONE_SP).toOffsetDateTime() : null;
+        OffsetDateTime endDateTime = endDate != null ? endDate.atTime(23, 59, 59, 999999999).atZone(ZONE_SP).toOffsetDateTime() : null;
+
+        List<Transaction> transactions = transactionRepositoryPort.findAllByFilters(userId, startDateTime, endDateTime, type);
+
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols(new Locale("pt", "BR"));
+        DecimalFormat currencyFormat = new DecimalFormat("R$ #,##0.00", symbols);
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        // UTF-8 BOM (Byte Order Mark) para garantir compatibilidade com Microsoft Excel no Windows
+        baos.write(0xEF);
+        baos.write(0xBB);
+        baos.write(0xBF);
+
+        PrintWriter writer = new PrintWriter(new OutputStreamWriter(baos, StandardCharsets.UTF_8));
+        writer.println("ID;Data/Hora;Tipo;Categoria;Descrição;Valor;Status;Destinatário;Motivo da Rejeição");
+
+        for (Transaction tx : transactions) {
+            String formattedDate = tx.getCreatedAt() != null ? tx.getCreatedAt().atZoneSameInstant(ZONE_SP).format(CSV_DATE_FORMAT) : "";
+            String typeStr = tx.getType() != null ? tx.getType().name() : "";
+            String catStr = tx.getCategory() != null ? tx.getCategory().name() : "";
+            String descStr = escapeCsv(tx.getDescription());
+            String amountStr = tx.getAmount() != null ? currencyFormat.format(tx.getAmount()) : "R$ 0,00";
+            String statusStr = tx.getStatus() != null ? tx.getStatus().name() : "";
+            String targetStr = tx.getTargetUserId() != null ? tx.getTargetUserId().toString() : "";
+            String reasonStr = escapeCsv(tx.getRejectionReason());
+
+            writer.printf("%s;%s;%s;%s;%s;%s;%s;%s;%s%n",
+                    tx.getId(),
+                    formattedDate,
+                    typeStr,
+                    catStr,
+                    descStr,
+                    amountStr,
+                    statusStr,
+                    targetStr,
+                    reasonStr
+            );
+        }
+
+        writer.flush();
+        return baos.toByteArray();
+    }
+
+    private String escapeCsv(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        String clean = value.replace("\"", "\"\"");
+        if (clean.contains(";") || clean.contains("\"") || clean.contains("\n") || clean.contains("\r")) {
+            return "\"" + clean + "\"";
+        }
+        return clean;
     }
 }

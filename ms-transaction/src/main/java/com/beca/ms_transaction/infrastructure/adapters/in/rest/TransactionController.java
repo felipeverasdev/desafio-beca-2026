@@ -1,14 +1,18 @@
 package com.beca.ms_transaction.infrastructure.adapters.in.rest;
 
+import com.beca.ms_transaction.application.ports.in.AnalyzeExpensesUseCase;
 import com.beca.ms_transaction.application.ports.in.CreateTransactionUseCase;
+import com.beca.ms_transaction.application.ports.in.ExportTransactionsCsvUseCase;
 import com.beca.ms_transaction.application.ports.in.GetAccountBalanceUseCase;
 import com.beca.ms_transaction.application.ports.in.GetTransactionByIdUseCase;
 import com.beca.ms_transaction.application.ports.in.SearchTransactionsUseCase;
 import com.beca.ms_transaction.domain.models.AccountBalance;
+import com.beca.ms_transaction.domain.models.ExpenseAnalysis;
 import com.beca.ms_transaction.domain.models.Transaction;
 import com.beca.ms_transaction.domain.models.TransactionDetails;
 import com.beca.ms_transaction.domain.models.TransactionType;
 import com.beca.ms_transaction.infrastructure.adapters.in.rest.dto.AccountBalanceResponseDTO;
+import com.beca.ms_transaction.infrastructure.adapters.in.rest.dto.ExpenseAnalysisResponseDTO;
 import com.beca.ms_transaction.infrastructure.adapters.in.rest.dto.TransactionRequestDTO;
 import com.beca.ms_transaction.infrastructure.adapters.in.rest.dto.TransactionResponseDTO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,10 +26,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -38,15 +45,21 @@ public class TransactionController {
     private final SearchTransactionsUseCase searchTransactionsUseCase;
     private final GetTransactionByIdUseCase getTransactionByIdUseCase;
     private final GetAccountBalanceUseCase getAccountBalanceUseCase;
+    private final AnalyzeExpensesUseCase analyzeExpensesUseCase;
+    private final ExportTransactionsCsvUseCase exportTransactionsCsvUseCase;
 
     public TransactionController(CreateTransactionUseCase createTransactionUseCase,
                                  SearchTransactionsUseCase searchTransactionsUseCase,
                                  GetTransactionByIdUseCase getTransactionByIdUseCase,
-                                 GetAccountBalanceUseCase getAccountBalanceUseCase) {
+                                 GetAccountBalanceUseCase getAccountBalanceUseCase,
+                                 AnalyzeExpensesUseCase analyzeExpensesUseCase,
+                                 ExportTransactionsCsvUseCase exportTransactionsCsvUseCase) {
         this.createTransactionUseCase = createTransactionUseCase;
         this.searchTransactionsUseCase = searchTransactionsUseCase;
         this.getTransactionByIdUseCase = getTransactionByIdUseCase;
         this.getAccountBalanceUseCase = getAccountBalanceUseCase;
+        this.analyzeExpensesUseCase = analyzeExpensesUseCase;
+        this.exportTransactionsCsvUseCase = exportTransactionsCsvUseCase;
     }
 
     @PostMapping
@@ -85,6 +98,40 @@ public class TransactionController {
     ) {
         Page<Transaction> result = searchTransactionsUseCase.execute(userId, startDate, endDate, type, pageable);
         return ResponseEntity.ok(result.map(TransactionResponseDTO::fromDomain));
+    }
+
+    @GetMapping("/analysis")
+    @Operation(summary = "Análise de despesas do usuário",
+            description = "Retorna o total gasto no período, percentual e somatório por categoria, além do detalhamento diário e mensal. Período padrão: mês atual.")
+    public ResponseEntity<ExpenseAnalysisResponseDTO> analyze(
+            @RequestParam("userId") UUID userId,
+            @RequestParam(value = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        ExpenseAnalysis analysis = analyzeExpensesUseCase.execute(userId, startDate, endDate);
+        return ResponseEntity.ok(ExpenseAnalysisResponseDTO.fromDomain(analysis));
+    }
+
+    @GetMapping(value = "/export-csv", produces = "text/csv; charset=UTF-8")
+    @Operation(summary = "Exportar relatório de transações em CSV",
+            description = "Gera e faz o download de um arquivo CSV formatado para Microsoft Excel pt-BR (delimitador ponto e vírgula, valores em R$ e acentuação UTF-8 BOM).")
+    public ResponseEntity<byte[]> exportCsv(
+            @RequestParam("userId") UUID userId,
+            @RequestParam(value = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(value = "type", required = false) TransactionType type
+    ) {
+        byte[] csvBytes = exportTransactionsCsvUseCase.execute(userId, startDate, endDate, type);
+        String filename = String.format("transacoes_%s.csv", LocalDate.now());
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .header(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
+                .body(csvBytes);
     }
 
     @GetMapping("/{id}")

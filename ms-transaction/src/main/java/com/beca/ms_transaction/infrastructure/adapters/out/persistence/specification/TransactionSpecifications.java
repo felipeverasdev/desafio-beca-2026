@@ -45,6 +45,11 @@ public class TransactionSpecifications {
 
             predicates.add(cb.equal(root.get("userId"), userId));
             predicates.add(cb.equal(root.get("status"), TransactionStatus.APPROVED));
+            predicates.add(root.get("type").in(
+                    TransactionType.WITHDRAWAL,
+                    TransactionType.TRANSFER,
+                    TransactionType.PURCHASE
+            ));
 
             if (startDate != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), startDate));

@@ -371,4 +371,104 @@ class TransactionServiceTest {
         assertThrows(AccountNotFoundException.class, () ->
                 transactionService.execute(userId));
     }
+
+    @Test
+    @DisplayName("Deve analisar despesas no período padrão (mês atual) com agrupamento e percentuais (KAN-12)")
+    void shouldAnalyzeExpensesWithDefaultPeriodAndPercentages() {
+        UUID userId = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.now();
+
+        Transaction tx1 = new Transaction(UUID.randomUUID(), userId, TransactionType.PURCHASE, TransactionStatus.APPROVED,
+                new BigDecimal("150.00"), TransactionCategory.ALIMENTACAO, "Mercado", null, null, now);
+        Transaction tx2 = new Transaction(UUID.randomUUID(), userId, TransactionType.PURCHASE, TransactionStatus.APPROVED,
+                new BigDecimal("50.00"), TransactionCategory.TRANSPORTE, "Uber", null, null, now);
+
+        when(userValidationPort.existsAndActive(userId)).thenReturn(true);
+        when(transactionRepositoryPort.findForAnalysis(eq(userId), any(), any()))
+                .thenReturn(List.of(tx1, tx2));
+
+        ExpenseAnalysis analysis = transactionService.execute(userId, null, null);
+
+        assertNotNull(analysis);
+        assertEquals(userId, analysis.userId());
+        assertEquals(new BigDecimal("200.00"), analysis.totalExpenses());
+        assertEquals(2, analysis.totalTransactions());
+        assertEquals(2, analysis.byCategory().size());
+
+        ExpenseAnalysis.CategoryExpenseSummary alimentacao = analysis.byCategory().stream()
+                .filter(c -> c.category() == TransactionCategory.ALIMENTACAO).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("150.00"), alimentacao.totalAmount());
+        assertEquals(new BigDecimal("75.00"), alimentacao.percentage());
+        assertEquals(1, alimentacao.transactionCount());
+
+        ExpenseAnalysis.CategoryExpenseSummary transporte = analysis.byCategory().stream()
+                .filter(c -> c.category() == TransactionCategory.TRANSPORTE).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("50.00"), transporte.totalAmount());
+        assertEquals(new BigDecimal("25.00"), transporte.percentage());
+        assertEquals(1, transporte.transactionCount());
+
+        assertEquals(1, analysis.byDay().size());
+        assertEquals(1, analysis.byMonth().size());
+    }
+
+    @Test
+    @DisplayName("Deve lançar InvalidTransactionException quando data inicial for posterior à data final na análise")
+    void shouldThrowWhenStartDateAfterEndDateOnAnalysis() {
+        UUID userId = UUID.randomUUID();
+        LocalDate start = LocalDate.now().plusDays(5);
+        LocalDate end = LocalDate.now();
+
+        when(userValidationPort.existsAndActive(userId)).thenReturn(true);
+
+        assertThrows(InvalidTransactionException.class, () ->
+                transactionService.execute(userId, start, end));
+    }
+
+    @Test
+    @DisplayName("Deve exportar relatório de transações em CSV compatível com Excel pt-BR (KAN-20)")
+    void shouldExportTransactionsCsvSuccessfully() {
+        UUID userId = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.now();
+
+        Transaction tx1 = new Transaction(UUID.randomUUID(), userId, TransactionType.PURCHASE, TransactionStatus.APPROVED,
+                new BigDecimal("1234.56"), TransactionCategory.ALIMENTACAO, "Compras do mês", null, null, now);
+        Transaction tx2 = new Transaction(UUID.randomUUID(), userId, TransactionType.WITHDRAWAL, TransactionStatus.REJECTED,
+                new BigDecimal("5000.00"), TransactionCategory.OUTROS, "Saque alto", null, "Limite diário excedido", now);
+
+        when(userValidationPort.existsAndActive(userId)).thenReturn(true);
+        when(transactionRepositoryPort.findAllByFilters(eq(userId), any(), any(), any()))
+                .thenReturn(List.of(tx1, tx2));
+
+        byte[] csvBytes = transactionService.execute(userId, LocalDate.now().minusDays(10), LocalDate.now(), null);
+
+        assertNotNull(csvBytes);
+        assertTrue(csvBytes.length > 3);
+        // Verifica UTF-8 BOM
+        assertEquals((byte) 0xEF, csvBytes[0]);
+        assertEquals((byte) 0xBB, csvBytes[1]);
+        assertEquals((byte) 0xBF, csvBytes[2]);
+
+        String csvContent = new String(csvBytes, java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(csvContent.contains("ID;Data/Hora;Tipo;Categoria;Descrição;Valor;Status;Destinatário;Motivo da Rejeição"));
+        assertTrue(csvContent.contains("PURCHASE"));
+        assertTrue(csvContent.contains("ALIMENTACAO"));
+        assertTrue(csvContent.contains("Compras do mês"));
+        assertTrue(csvContent.contains("R$ 1.234,56") || csvContent.contains("1.234,56"));
+        assertTrue(csvContent.contains("WITHDRAWAL"));
+        assertTrue(csvContent.contains("REJECTED"));
+        assertTrue(csvContent.contains("Limite diário excedido"));
+    }
+
+    @Test
+    @DisplayName("Deve lançar InvalidTransactionException quando data inicial for posterior à data final na exportação CSV")
+    void shouldThrowWhenStartDateAfterEndDateOnCsvExport() {
+        UUID userId = UUID.randomUUID();
+        LocalDate start = LocalDate.now().plusDays(5);
+        LocalDate end = LocalDate.now();
+
+        when(userValidationPort.existsAndActive(userId)).thenReturn(true);
+
+        assertThrows(InvalidTransactionException.class, () ->
+                transactionService.execute(userId, start, end, null));
+    }
 }
