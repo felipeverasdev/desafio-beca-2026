@@ -10,13 +10,16 @@ public record UpdateUserCommand(
             throw new IllegalArgumentException("O nome é obrigatório");
         }
         name = name.trim();
-        if (name.length() < 3) {
-            throw new IllegalArgumentException("O nome deve conter pelo menos 3 caracteres");
+        if (name.length() < 3 || name.length() > 150) {
+            throw new IllegalArgumentException("O nome deve conter entre 3 e 150 caracteres");
         }
         if (email == null || email.isBlank()) {
             throw new IllegalArgumentException("O e-mail é obrigatório");
         }
         email = email.trim().toLowerCase();
+        if (email.length() > 150) {
+            throw new IllegalArgumentException("O e-mail deve ter no máximo 150 caracteres");
+        }
         if (!email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")) {
             throw new IllegalArgumentException("Formato de e-mail inválido");
         }

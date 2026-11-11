@@ -142,10 +142,14 @@ public class UserController {
     @Operation(summary = "Buscar usuário por identificador (ID)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário encontrado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado: o usuário autenticado não pode consultar dados de outro usuário"),
             @ApiResponse(responseCode = "404", description = "Usuário não localizado no sistema")
     })
     @GetMapping("/{id}")
-    public ResponseEntity<UserResponseDTO> findById(@PathVariable UUID id) {
+    public ResponseEntity<UserResponseDTO> findById(@PathVariable UUID id,
+                                                    @AuthenticationPrincipal UserSecurityDetails authenticatedUser) {
+        validateOwnership(authenticatedUser, id);
+
         User user = findUserUseCase.findById(id);
 
         UserResponseDTO response = new UserResponseDTO(
@@ -161,13 +165,31 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Verificar existência de usuário ativo (Inter-serviços)",
+            description = "Endpoint para validação inter-serviços. Retorna 200 se o usuário existe e está ativo, ou 404 se não encontrado ou inativo. Não expõe dados sensíveis.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Usuário existe e está ativo"),
+            @ApiResponse(responseCode = "404", description = "Usuário não localizado ou inativo")
+    })
+    @GetMapping("/{id}/exists")
+    public ResponseEntity<Void> checkExists(@PathVariable UUID id) {
+        findUserUseCase.findById(id);
+        return ResponseEntity.ok().build();
+    }
+
     @Operation(summary = "Buscar usuário por e-mail")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário encontrado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado: o usuário autenticado só pode consultar o próprio e-mail"),
             @ApiResponse(responseCode = "404", description = "Usuário não localizado no sistema")
     })
     @GetMapping("/by-email")
-    public ResponseEntity<UserResponseDTO> findByEmail(@RequestParam String email) {
+    public ResponseEntity<UserResponseDTO> findByEmail(@RequestParam String email,
+                                                       @AuthenticationPrincipal UserSecurityDetails authenticatedUser) {
+        if (authenticatedUser == null || !authenticatedUser.getUsername().equalsIgnoreCase(email != null ? email.trim() : "")) {
+            throw new AccessDeniedException("Você não tem permissão para consultar os dados de outro usuário");
+        }
+
         User user = findUserUseCase.findByEmail(email.trim().toLowerCase());
 
         UserResponseDTO response = new UserResponseDTO(
@@ -220,8 +242,8 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "Listar usuários excluídos do sistema (Demonstração)",
-            description = "Retorna todos os usuários desativados (soft-deleted). Rota pública para fins didáticos e apresentação da entrega.")
+    @Operation(summary = "Listar usuários excluídos do sistema",
+            description = "Retorna todos os usuários desativados (soft-deleted). Requer autenticação HTTP Basic.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de usuários deletados retornada com sucesso")
     })
@@ -245,7 +267,7 @@ public class UserController {
 
     private void validateOwnership(UserSecurityDetails authenticatedUser, UUID targetId) {
         if (authenticatedUser == null || !authenticatedUser.getId().equals(targetId)) {
-            throw new AccessDeniedException("Você não tem permissão para alterar ou excluir outro usuário");
+            throw new AccessDeniedException("Você não tem permissão para acessar ou alterar os dados de outro usuário");
         }
     }
 }
