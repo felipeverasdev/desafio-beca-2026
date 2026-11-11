@@ -1,5 +1,6 @@
 package com.beca.ms_transaction.infrastructure.adapters.in.rest.exception;
 
+import com.beca.ms_transaction.domain.exceptions.ExternalServiceUnavailableException;
 import com.beca.ms_transaction.domain.exceptions.InvalidTransactionException;
 import com.beca.ms_transaction.domain.exceptions.TransactionNotFoundException;
 import com.beca.ms_transaction.domain.exceptions.UnauthorizedTransactionException;
@@ -80,6 +81,19 @@ public class GlobalExceptionHandler {
                 Instant.now(),
                 status.value(),
                 "Forbidden",
+                e.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(status).body(err);
+    }
+
+    @ExceptionHandler(ExternalServiceUnavailableException.class)
+    public ResponseEntity<StandardError> serviceUnavailable(ExternalServiceUnavailableException e, HttpServletRequest request) {
+        HttpStatus status = HttpStatus.SERVICE_UNAVAILABLE; // 503
+        StandardError err = new StandardError(
+                Instant.now(),
+                status.value(),
+                "Service Unavailable",
                 e.getMessage(),
                 request.getRequestURI()
         );

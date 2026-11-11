@@ -6,7 +6,9 @@ import com.beca.ms_transaction.application.ports.in.ExportTransactionsCsvUseCase
 import com.beca.ms_transaction.application.ports.in.GetAccountBalanceUseCase;
 import com.beca.ms_transaction.application.ports.in.GetTransactionByIdUseCase;
 import com.beca.ms_transaction.application.ports.in.SearchTransactionsUseCase;
+import com.beca.ms_transaction.domain.exceptions.UnauthorizedTransactionException;
 import com.beca.ms_transaction.domain.models.AccountBalance;
+import com.beca.ms_transaction.domain.models.AuthenticatedUser;
 import com.beca.ms_transaction.domain.models.ExpenseAnalysis;
 import com.beca.ms_transaction.domain.models.Transaction;
 import com.beca.ms_transaction.domain.models.TransactionDetails;
@@ -30,6 +32,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -68,7 +71,10 @@ public class TransactionController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Transação processada com sucesso (status APPROVED ou REJECTED gravado)")
     })
-    public ResponseEntity<TransactionResponseDTO> create(@Valid @RequestBody TransactionRequestDTO dto) {
+    public ResponseEntity<TransactionResponseDTO> create(
+            @Valid @RequestBody TransactionRequestDTO dto,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+        validateOwnership(authenticatedUser, dto.userId());
         Transaction created = createTransactionUseCase.execute(dto.toCommand());
         return ResponseEntity.status(HttpStatus.CREATED).body(TransactionResponseDTO.fromDomain(created));
     }
@@ -80,7 +86,10 @@ public class TransactionController {
             @ApiResponse(responseCode = "200", description = "Saldo e limites retornados com sucesso"),
             @ApiResponse(responseCode = "404", description = "Conta não encontrada no serviço de autorização")
     })
-    public ResponseEntity<AccountBalanceResponseDTO> getBalance(@PathVariable UUID userId) {
+    public ResponseEntity<AccountBalanceResponseDTO> getBalance(
+            @PathVariable UUID userId,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+        validateOwnership(authenticatedUser, userId);
         AccountBalance balance = getAccountBalanceUseCase.execute(userId);
         return ResponseEntity.ok(AccountBalanceResponseDTO.fromDomain(balance));
     }
@@ -94,8 +103,10 @@ public class TransactionController {
             @RequestParam(value = "endDate", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime endDate,
             @RequestParam(value = "type", required = false) TransactionType type,
-            @ParameterObject @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+            @ParameterObject @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser
     ) {
+        validateOwnership(authenticatedUser, userId);
         Page<Transaction> result = searchTransactionsUseCase.execute(userId, startDate, endDate, type, pageable);
         return ResponseEntity.ok(result.map(TransactionResponseDTO::fromDomain));
     }
@@ -108,8 +119,10 @@ public class TransactionController {
             @RequestParam(value = "startDate", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(value = "endDate", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser
     ) {
+        validateOwnership(authenticatedUser, userId);
         ExpenseAnalysis analysis = analyzeExpensesUseCase.execute(userId, startDate, endDate);
         return ResponseEntity.ok(ExpenseAnalysisResponseDTO.fromDomain(analysis));
     }
@@ -123,8 +136,10 @@ public class TransactionController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(value = "endDate", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(value = "type", required = false) TransactionType type
+            @RequestParam(value = "type", required = false) TransactionType type,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser
     ) {
+        validateOwnership(authenticatedUser, userId);
         byte[] csvBytes = exportTransactionsCsvUseCase.execute(userId, startDate, endDate, type);
         String filename = String.format("transacoes_%s.csv", LocalDate.now());
 
@@ -139,10 +154,18 @@ public class TransactionController {
             description = "Retorna os detalhes da transação e os valores convertidos em USD e EUR pela BrasilAPI.")
     public ResponseEntity<TransactionResponseDTO> getById(
             @PathVariable("id") UUID id,
-            @RequestHeader(value = "X-User-Id", required = false) UUID authenticatedUserId
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            @RequestHeader(value = "X-User-Id", required = false) UUID headerUserId
     ) {
-        TransactionDetails details = getTransactionByIdUseCase.execute(id, authenticatedUserId);
+        UUID callerId = authenticatedUser != null ? authenticatedUser.id() : headerUserId;
+        TransactionDetails details = getTransactionByIdUseCase.execute(id, callerId);
         return ResponseEntity.ok(TransactionResponseDTO.fromDomain(details.transaction(), details.conversions()));
+    }
+
+    private void validateOwnership(AuthenticatedUser authenticatedUser, UUID targetUserId) {
+        if (authenticatedUser != null && targetUserId != null && !authenticatedUser.id().equals(targetUserId)) {
+            throw new UnauthorizedTransactionException("Você não tem permissão para acessar ou operar dados de outro usuário");
+        }
     }
 }
 

@@ -1,12 +1,13 @@
 package com.beca.ms_transaction.infrastructure.adapters.out.client.msuser;
 
 import com.beca.ms_transaction.application.ports.out.UserValidationPort;
+import com.beca.ms_transaction.domain.exceptions.ExternalServiceUnavailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.UUID;
 
@@ -35,15 +36,21 @@ public class MsUserValidationAdapter implements UserValidationPort {
             return restClient.get()
                     .uri(msUsersUrl + "/{id}/exists", userId)
                     .retrieve()
-                    .onStatus(HttpStatusCode::is4xxClientError, (req, resp) -> {
-                        log.debug("ms-user retornou {} para userId {}", resp.getStatusCode(), userId);
+                    .onStatus(status -> status.value() == 404, (req, resp) -> {
+                        log.debug("ms-user retornou 404 para userId {}", userId);
                     })
                     .toBodilessEntity()
                     .getStatusCode()
                     .is2xxSuccessful();
+        } catch (RestClientResponseException ex) {
+            if (ex.getStatusCode().value() == 404) {
+                return false;
+            }
+            log.error("ms-user retornou status {} ao validar userId {}: {}", ex.getStatusCode(), userId, ex.getMessage());
+            throw new ExternalServiceUnavailableException("Serviço de usuários indisponível");
         } catch (Exception ex) {
-            log.warn("Falha ao consultar usuário {} no ms-user ({}): {}", userId, msUsersUrl, ex.getMessage());
-            return false;
+            log.error("Falha ao conectar no ms-user ({}) para userId {}: {}", msUsersUrl, userId, ex.getMessage());
+            throw new ExternalServiceUnavailableException("Serviço de usuários indisponível");
         }
     }
 }

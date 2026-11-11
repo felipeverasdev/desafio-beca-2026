@@ -86,7 +86,7 @@ public class TransactionService implements CreateTransactionUseCase, SearchTrans
             throw new InvalidTransactionException("A categoria da despesa é obrigatória para compras");
         }
 
-        // Depósitos são aprovados diretamente sem consulta a limites
+        // Depósitos são aprovados diretamente sem consulta a limites e creditados na MockAPI
         if (command.type() == TransactionType.DEPOSIT) {
             Transaction deposit = Transaction.createApproved(
                     command.userId(),
@@ -96,7 +96,12 @@ public class TransactionService implements CreateTransactionUseCase, SearchTrans
                     command.description(),
                     command.targetUserId()
             );
-            return transactionRepositoryPort.save(deposit);
+            Transaction saved = transactionRepositoryPort.save(deposit);
+            accountAuthorizationPort.findAccountBalance(command.userId()).ifPresent(acc -> {
+                BigDecimal currentBalance = acc.balance() != null ? acc.balance() : BigDecimal.ZERO;
+                accountAuthorizationPort.updateBalance(command.userId(), currentBalance.add(command.amount()));
+            });
+            return saved;
         }
 
         // Para saques, transferências e compras: validação de saldo e limites via API Mock
@@ -160,10 +165,11 @@ public class TransactionService implements CreateTransactionUseCase, SearchTrans
             return transactionRepositoryPort.save(rejected);
         }
 
-        // Regra 3: Limite diário acumulado
+        // Regra 3: Limite diário acumulado (fuso horário America/Sao_Paulo)
         if (account.dailyLimit() != null) {
-            OffsetDateTime startOfDay = OffsetDateTime.now().truncatedTo(ChronoUnit.DAYS);
-            OffsetDateTime endOfDay = startOfDay.plusDays(1);
+            LocalDate todaySp = LocalDate.now(ZONE_SP);
+            OffsetDateTime startOfDay = todaySp.atStartOfDay(ZONE_SP).toOffsetDateTime();
+            OffsetDateTime endOfDay = todaySp.plusDays(1).atStartOfDay(ZONE_SP).toOffsetDateTime();
             BigDecimal todayOutflows = transactionRepositoryPort.sumApprovedOutflowAmountForUserBetween(command.userId(), startOfDay, endOfDay);
             if (todayOutflows == null) {
                 todayOutflows = BigDecimal.ZERO;
@@ -192,7 +198,22 @@ public class TransactionService implements CreateTransactionUseCase, SearchTrans
                 command.description(),
                 command.targetUserId()
         );
-        return transactionRepositoryPort.save(approved);
+        Transaction saved = transactionRepositoryPort.save(approved);
+
+        // Atualiza (debita) saldo na MockAPI para a conta originadora
+        BigDecimal currentBalance = account.balance() != null ? account.balance() : BigDecimal.ZERO;
+        BigDecimal newBalance = currentBalance.subtract(command.amount());
+        accountAuthorizationPort.updateBalance(command.userId(), newBalance);
+
+        // Se for transferência, credita o destinatário se possuir conta na MockAPI
+        if (command.type() == TransactionType.TRANSFER && command.targetUserId() != null) {
+            accountAuthorizationPort.findAccountBalance(command.targetUserId()).ifPresent(targetAcc -> {
+                BigDecimal targetCurrent = targetAcc.balance() != null ? targetAcc.balance() : BigDecimal.ZERO;
+                accountAuthorizationPort.updateBalance(command.targetUserId(), targetCurrent.add(command.amount()));
+            });
+        }
+
+        return saved;
     }
 
     @Override

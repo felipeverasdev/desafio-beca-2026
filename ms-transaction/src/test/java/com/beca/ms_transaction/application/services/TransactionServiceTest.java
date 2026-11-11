@@ -67,6 +67,9 @@ class TransactionServiceTest {
         );
 
         when(userValidationPort.existsAndActive(userId)).thenReturn(true);
+        when(accountAuthorizationPort.findAccountBalance(userId)).thenReturn(Optional.of(
+                new AccountBalance(userId, new BigDecimal("100.00"), new BigDecimal("1000.00"), new BigDecimal("500.00"))
+        ));
         when(transactionRepositoryPort.save(any(Transaction.class))).thenAnswer(invocation -> {
             Transaction t = invocation.getArgument(0);
             return new Transaction(UUID.randomUUID(), t.getUserId(), t.getType(), t.getStatus(), t.getAmount(), t.getCategory(), t.getDescription(), t.getTargetUserId(), t.getRejectionReason(), OffsetDateTime.now());
@@ -79,7 +82,7 @@ class TransactionServiceTest {
         assertEquals(TransactionStatus.APPROVED, result.getStatus());
         assertEquals(new BigDecimal("250.00"), result.getAmount());
         verify(transactionRepositoryPort, times(1)).save(any(Transaction.class));
-        verifyNoInteractions(accountAuthorizationPort);
+        verify(accountAuthorizationPort, times(1)).updateBalance(userId, new BigDecimal("350.00"));
     }
 
     @Test
@@ -165,6 +168,7 @@ class TransactionServiceTest {
         assertEquals(TransactionStatus.APPROVED, result.getStatus());
         assertNull(result.getRejectionReason());
         assertEquals(new BigDecimal("150.00"), result.getAmount());
+        verify(accountAuthorizationPort, times(1)).updateBalance(userId, new BigDecimal("850.00"));
     }
 
     @Test

@@ -70,5 +70,44 @@ public class MockApiAccountAuthorizationAdapter implements AccountAuthorizationP
             throw new ExternalServiceUnavailableException("Serviço autorizador (MockAPI) indisponível no momento");
         }
     }
+
+    @Override
+    public void updateBalance(UUID userId, java.math.BigDecimal newBalance) {
+        if (userId == null || newBalance == null) {
+            return;
+        }
+
+        try {
+            List<MockApiUserAccountDTO> accounts = restClient.get()
+                    .uri(mockApiUrl + "?userId={userId}", userId.toString())
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<List<MockApiUserAccountDTO>>() {});
+
+            if (accounts == null || accounts.isEmpty()) {
+                log.warn("Tentativa de atualizar saldo para conta inexistente na MockAPI: userId {}", userId);
+                return;
+            }
+
+            MockApiUserAccountDTO account = accounts.get(0);
+            MockApiUserAccountDTO updated = new MockApiUserAccountDTO(
+                    account.id(),
+                    account.userId(),
+                    newBalance,
+                    account.dailyLimit(),
+                    account.transactionLimit()
+            );
+
+            restClient.put()
+                    .uri(mockApiUrl + "/{id}", account.id())
+                    .body(updated)
+                    .retrieve()
+                    .toBodilessEntity();
+
+            log.info("Saldo atualizado no MockAPI para userId {}: novo saldo = R$ {}", userId, newBalance);
+        } catch (Exception ex) {
+            log.error("Erro ao atualizar saldo no MockAPI para userId {}: {}", userId, ex.getMessage());
+            throw new ExternalServiceUnavailableException("Falha ao atualizar saldo no serviço autorizador (MockAPI)");
+        }
+    }
 }
 
