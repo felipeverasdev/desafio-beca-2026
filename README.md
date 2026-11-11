@@ -110,14 +110,16 @@ Com os containers em execução, acesse as interfaces interativas no navegador:
 
 ### Microsserviço 2: `ms-transaction` (Porta 8082)
 
-| Método | Rota                                   | Autenticação       | Descrição                                                                                                                                           |
-| :----- | :------------------------------------- | :----------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST` | `/api/v1/transactions`                 | Aberta             | Valida usuário no `ms-user`, valida saldo e limites no MockAPI e grava transação (`APPROVED` ou `REJECTED`).                                       |
-| `GET`  | `/api/v1/transactions`                 | Aberta             | Busca paginada com filtros por usuário (`userId`), data (`startDate`, `endDate`) e tipo (`type`).                                                  |
-| `GET`  | `/api/v1/transactions/{id}`            | Aberta / Opcional  | Detalha a transação por ID, enriquecendo a resposta com conversões cambiais para USD e EUR obtidas via **BrasilAPI**.                              |
-| `GET`  | `/api/v1/transactions/balance/{userId}` | Aberta             | Consulta o saldo disponível, limite diário e limite por operação da conta do usuário no serviço autorizador (MockAPI).                              |
-| `GET`  | `/api/v1/transactions/analysis`        | Aberta             | Análise de despesas (saídas aprovadas: compras, saques e transferências) com totais e percentuais por categoria, dia e mês (padrão: mês atual).     |
-| `GET`  | `/api/v1/transactions/export-csv`      | Aberta             | Exportação do extrato/relatório de transações em CSV para Excel pt-BR (delimitador `;`, `R$ 1.234,56`, `dd/MM/yyyy HH:mm:ss` e UTF-8 BOM).        |
+Todas as rotas do `ms-transaction` exigem autenticação HTTP Basic (usuário e senha cadastrados no `ms-user`). Cada usuário autenticado só pode consultar e movimentar sua própria conta (tentativas de acessar ou operar dados de outro usuário resultam em `403 Forbidden`).
+
+| Método | Rota                                   | Autenticação | Descrição                                                                                                                                           |
+| :----- | :------------------------------------- | :----------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST` | `/api/v1/transactions`                 | Autenticada  | Valida usuário no `ms-user`, valida saldo e limites no MockAPI, grava transação (`APPROVED` ou `REJECTED`) e atualiza saldo na MockAPI.           |
+| `GET`  | `/api/v1/transactions`                 | Autenticada  | Busca paginada com filtros por usuário (`userId`), data (`startDate`, `endDate`) e tipo (`type`).                                                  |
+| `GET`  | `/api/v1/transactions/{id}`            | Autenticada  | Detalha a transação do usuário por ID, enriquecendo a resposta com conversões cambiais para USD e EUR obtidas via **BrasilAPI**.                    |
+| `GET`  | `/api/v1/transactions/balance/{userId}` | Autenticada  | Consulta o saldo disponível, limite diário e limite por operação da conta do usuário no serviço autorizador (MockAPI).                              |
+| `GET`  | `/api/v1/transactions/analysis`        | Autenticada  | Análise de despesas (saídas aprovadas: compras, saques e transferências) com totais e percentuais por categoria, dia e mês (padrão: mês atual).     |
+| `GET`  | `/api/v1/transactions/export-csv`      | Autenticada  | Exportação do extrato/relatório de transações em CSV para Excel pt-BR (delimitador `;`, `R$ 1.234,56`, `dd/MM/yyyy HH:mm:ss` e UTF-8 BOM).        |
 
 #### Exemplo de Payload para Transação (`POST /api/v1/transactions`):
 
