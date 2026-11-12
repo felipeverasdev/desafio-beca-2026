@@ -1,5 +1,6 @@
 package com.beca.ms_transaction.infrastructure.adapters.in.rest.exception;
 
+import com.beca.ms_transaction.domain.exceptions.AccountNotFoundException;
 import com.beca.ms_transaction.domain.exceptions.ExternalServiceUnavailableException;
 import com.beca.ms_transaction.domain.exceptions.InvalidTransactionException;
 import com.beca.ms_transaction.domain.exceptions.TransactionNotFoundException;
@@ -35,8 +36,8 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(err);
     }
 
-    @ExceptionHandler(TransactionNotFoundException.class)
-    public ResponseEntity<StandardError> transactionNotFound(TransactionNotFoundException e, HttpServletRequest request) {
+    @ExceptionHandler({TransactionNotFoundException.class, AccountNotFoundException.class})
+    public ResponseEntity<StandardError> resourceNotFound(RuntimeException e, HttpServletRequest request) {
         HttpStatus status = HttpStatus.NOT_FOUND;
         StandardError err = new StandardError(
                 Instant.now(),

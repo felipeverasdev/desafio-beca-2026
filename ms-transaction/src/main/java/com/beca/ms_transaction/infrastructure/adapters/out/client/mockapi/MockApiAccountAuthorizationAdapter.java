@@ -76,13 +76,34 @@ public class MockApiAccountAuthorizationAdapter implements AccountAuthorizationP
         }
 
         try {
-            List<MockApiUserAccountDTO> accounts = restClient.get()
-                    .uri(mockApiUrl + "?userId={userId}", userId.toString())
-                    .retrieve()
-                    .body(new ParameterizedTypeReference<List<MockApiUserAccountDTO>>() {});
+            List<MockApiUserAccountDTO> accounts = null;
+            try {
+                accounts = restClient.get()
+                        .uri(mockApiUrl + "?userId={userId}", userId.toString())
+                        .retrieve()
+                        .body(new ParameterizedTypeReference<List<MockApiUserAccountDTO>>() {});
+            } catch (RestClientResponseException ex) {
+                if (ex.getStatusCode().value() != 404) {
+                    throw ex;
+                }
+            }
 
             if (accounts == null || accounts.isEmpty()) {
-                log.warn("Tentativa de atualizar saldo para conta inexistente na MockAPI: userId {}", userId);
+                MockApiUserAccountDTO newAccount = new MockApiUserAccountDTO(
+                        null,
+                        userId.toString(),
+                        newBalance,
+                        new java.math.BigDecimal("2000.00"),
+                        new java.math.BigDecimal("1000.00")
+                );
+
+                restClient.post()
+                        .uri(mockApiUrl)
+                        .body(newAccount)
+                        .retrieve()
+                        .toBodilessEntity();
+
+                log.info("Conta criada com sucesso na MockAPI para userId {}: saldo inicial = R$ {}", userId, newBalance);
                 return;
             }
 
@@ -91,8 +112,8 @@ public class MockApiAccountAuthorizationAdapter implements AccountAuthorizationP
                     account.id(),
                     account.userId(),
                     newBalance,
-                    account.dailyLimit(),
-                    account.transactionLimit()
+                    account.dailyLimit() != null ? account.dailyLimit() : new java.math.BigDecimal("2000.00"),
+                    account.transactionLimit() != null ? account.transactionLimit() : new java.math.BigDecimal("1000.00")
             );
 
             restClient.put()
@@ -102,15 +123,8 @@ public class MockApiAccountAuthorizationAdapter implements AccountAuthorizationP
                     .toBodilessEntity();
 
             log.info("Saldo atualizado no MockAPI para userId {}: novo saldo = R$ {}", userId, newBalance);
-        } catch (RestClientResponseException ex) {
-            if (ex.getStatusCode().value() == 404) {
-                log.warn("Conta inexistente na MockAPI para userId {}", userId);
-                return;
-            }
-            log.error("Erro retornado pelo MockAPI ao atualizar userId {}: {}", userId, ex.getMessage());
-            throw new ExternalServiceUnavailableException("Falha ao atualizar saldo no serviço autorizador (MockAPI)");
         } catch (Exception ex) {
-            log.error("Erro ao atualizar saldo no MockAPI para userId {}: {}", userId, ex.getMessage());
+            log.error("Erro ao atualizar ou criar saldo no MockAPI para userId {}: {}", userId, ex.getMessage());
             throw new ExternalServiceUnavailableException("Falha ao atualizar saldo no serviço autorizador (MockAPI)");
         }
     }

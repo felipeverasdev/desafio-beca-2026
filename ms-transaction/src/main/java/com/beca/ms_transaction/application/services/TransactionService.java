@@ -97,10 +97,12 @@ public class TransactionService implements CreateTransactionUseCase, SearchTrans
                     command.targetUserId()
             );
             Transaction saved = transactionRepositoryPort.save(deposit);
-            accountAuthorizationPort.findAccountBalance(command.userId()).ifPresent(acc -> {
-                BigDecimal currentBalance = acc.balance() != null ? acc.balance() : BigDecimal.ZERO;
-                accountAuthorizationPort.updateBalance(command.userId(), currentBalance.add(command.amount()));
-            });
+            BigDecimal currentBalance = BigDecimal.ZERO;
+            Optional<AccountBalance> accOpt = accountAuthorizationPort.findAccountBalance(command.userId());
+            if (accOpt.isPresent() && accOpt.get().balance() != null) {
+                currentBalance = accOpt.get().balance();
+            }
+            accountAuthorizationPort.updateBalance(command.userId(), currentBalance.add(command.amount()));
             return saved;
         }
 
