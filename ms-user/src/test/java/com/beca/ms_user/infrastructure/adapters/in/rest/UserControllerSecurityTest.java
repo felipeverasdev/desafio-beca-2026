@@ -93,23 +93,11 @@ class UserControllerSecurityTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/users deve retornar 401 Unauthorized sem credenciais")
-    void shouldReturn401OnFindAllWithoutAuth() throws Exception {
-        mockMvc.perform(get("/api/v1/users"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.status").value(401));
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/users deve listar apenas o próprio usuário autenticado e não expor outros usuários")
-    void shouldListOnlyAuthenticatedUserOnFindAll() throws Exception {
+    @DisplayName("GET /api/v1/users deve retornar 405 Method Not Allowed pois a listagem de usuários foi removida")
+    void shouldReturn405WhenAccessingUsersListEndpoint() throws Exception {
         mockMvc.perform(get("/api/v1/users")
                         .with(httpBasic("usera@email.com", "senha123")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(1))
-                .andExpect(jsonPath("$.content[0].id").value(userA.getId().toString()))
-                .andExpect(jsonPath("$.content[0].name").value("Usuario A"))
-                .andExpect(jsonPath("$.content[0].email").value("usera@email.com"));
+                .andExpect(status().isMethodNotAllowed());
     }
 
     @Test
@@ -198,10 +186,36 @@ class UserControllerSecurityTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/{id}/exists deve ser público (200 para usuário ativo)")
-    void shouldReturn200OnExistsWithoutAuth() throws Exception {
+    @DisplayName("GET /api/v1/users/{id}/exists deve retornar 401 Unauthorized quando chamado sem o token de serviço")
+    void shouldReturn401OnExistsWithoutServiceToken() throws Exception {
         mockMvc.perform(get("/api/v1/users/{id}/exists", userA.getId()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/{id}/exists deve retornar 401 Unauthorized com token de serviço inválido")
+    void shouldReturn401OnExistsWithInvalidServiceToken() throws Exception {
+        mockMvc.perform(get("/api/v1/users/{id}/exists", userA.getId())
+                        .header("X-Service-Token", "token-invalido"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/{id}/exists deve retornar 200 OK com token de serviço válido para usuário ativo")
+    void shouldReturn200OnExistsWithValidServiceToken() throws Exception {
+        mockMvc.perform(get("/api/v1/users/{id}/exists", userA.getId())
+                        .header("X-Service-Token", "beca-internal-token-secret-2026"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/{id}/exists deve retornar 404 Not Found com token válido para usuário inexistente")
+    void shouldReturn404OnExistsWithValidServiceTokenWhenUserNotFound() throws Exception {
+        mockMvc.perform(get("/api/v1/users/{id}/exists", UUID.randomUUID())
+                        .header("X-Service-Token", "beca-internal-token-secret-2026"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

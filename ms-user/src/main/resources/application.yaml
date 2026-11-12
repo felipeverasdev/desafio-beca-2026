@@ -21,3 +21,8 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   application:
     name: ms-user
+
+services:
+  internal:
+    token: ${INTERNAL_SERVICE_TOKEN:beca-internal-token-secret-2026}
+

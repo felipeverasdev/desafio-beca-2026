@@ -34,6 +34,7 @@ services:
       - MS_USERS_DB_USER=${MS_USERS_DB_USER:-user_admin}
       - MS_USERS_DB_PASS=${MS_USERS_DB_PASS:-123456}
       - SERVER_PORT=8081
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN:-beca-internal-token-secret-2026}
     depends_on:
       user-db:
         condition: service_healthy

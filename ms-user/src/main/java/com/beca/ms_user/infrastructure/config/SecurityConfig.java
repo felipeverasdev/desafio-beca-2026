@@ -34,7 +34,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/users").permitAll()
                         // Endpoint de autenticação
                         .requestMatchers(HttpMethod.POST, "/api/v1/users/auth").permitAll()
-                        // Validação de existência inter-serviços (sem dados sensíveis)
+                        // Validação de existência inter-serviços (autenticada por token de serviço X-Service-Token)
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/{id}/exists").permitAll()
                         // Documentação Swagger e OpenAPI abertas
                         .requestMatchers(

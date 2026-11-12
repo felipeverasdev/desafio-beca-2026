@@ -1,6 +1,7 @@
 package com.beca.ms_user.infrastructure.adapters.in.rest;
 
 import com.beca.ms_user.application.ports.in.*;
+import com.beca.ms_user.domain.exceptions.InvalidCredentialsException;
 import com.beca.ms_user.domain.models.User;
 import com.beca.ms_user.infrastructure.adapters.in.rest.dto.*;
 import com.beca.ms_user.infrastructure.adapters.out.security.UserSecurityDetails;
@@ -10,8 +11,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
@@ -37,19 +38,22 @@ public class UserController {
     private final DeleteUserUseCase deleteUserUseCase;
     private final AuthenticateUserUseCase authenticateUserUseCase;
     private final ImportUsersCsvUseCase importUsersCsvUseCase;
+    private final String internalServiceToken;
 
     public UserController(CreateUserUseCase createUserUseCase,
                           FindUserUseCase findUserUseCase,
                           UpdateUserUseCase updateUserUseCase,
                           DeleteUserUseCase deleteUserUseCase,
                           AuthenticateUserUseCase authenticateUserUseCase,
-                          ImportUsersCsvUseCase importUsersCsvUseCase) {
+                          ImportUsersCsvUseCase importUsersCsvUseCase,
+                          @Value("${services.internal.token:beca-internal-token-secret-2026}") String internalServiceToken) {
         this.createUserUseCase = createUserUseCase;
         this.findUserUseCase = findUserUseCase;
         this.updateUserUseCase = updateUserUseCase;
         this.deleteUserUseCase = deleteUserUseCase;
         this.authenticateUserUseCase = authenticateUserUseCase;
         this.importUsersCsvUseCase = importUsersCsvUseCase;
+        this.internalServiceToken = internalServiceToken;
     }
 
     @Operation(summary = "Criar um novo usuário",
@@ -126,27 +130,6 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "Listar dados do usuário autenticado (restrito ao próprio usuário)",
-            description = "Retorna listagem paginada contendo estritamente os dados resumidos do usuário autenticado, prevenindo enumeração de outros clientes.")
-    @GetMapping
-    public ResponseEntity<Page<UserSummaryDTO>> findAll(@ParameterObject @PageableDefault(size = 10) Pageable pageable,
-                                                        @AuthenticationPrincipal UserSecurityDetails authenticatedUser) {
-        if (authenticatedUser == null) {
-            throw new AccessDeniedException("Autenticação necessária");
-        }
-
-        User user = findUserUseCase.findById(authenticatedUser.getId());
-
-        UserSummaryDTO summary = new UserSummaryDTO(
-                user.getId(),
-                user.getName(),
-                user.getEmail()
-        );
-
-        Page<UserSummaryDTO> response = new PageImpl<>(List.of(summary), pageable, 1);
-        return ResponseEntity.ok(response);
-    }
-
     @Operation(summary = "Buscar usuário por identificador (ID)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário encontrado"),
@@ -174,15 +157,20 @@ public class UserController {
     }
 
     @Operation(summary = "Verificar existência de usuário ativo (Inter-serviços)",
-            description = "Endpoint para validação síncrona inter-serviços. Retorna 200 se o usuário existe e está ativo, ou 404 se não encontrado ou inativo. " +
-                    "Decisão de segurança: Rota pública interna sem dados sensíveis (Void). A enumeração é mitigada pela alta entropia do UUID v4 (122 bits aleatórios). " +
-                    "Consulte a seção de Análise de Risco no README para detalhes.")
+            description = "Endpoint para validação síncrona inter-serviços. Requer credencial de serviço no cabeçalho X-Service-Token. " +
+                    "Retorna 200 se o usuário existe e está ativo, 404 se não localizado ou inativo, ou 401 se a credencial for inválida ou ausente.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário existe e está ativo"),
+            @ApiResponse(responseCode = "401", description = "Credencial de serviço ausente ou inválida"),
             @ApiResponse(responseCode = "404", description = "Usuário não localizado ou inativo")
     })
     @GetMapping("/{id}/exists")
-    public ResponseEntity<Void> checkExists(@PathVariable UUID id) {
+    public ResponseEntity<Void> checkExists(
+            @PathVariable UUID id,
+            @RequestHeader(value = "X-Service-Token", required = false) String serviceToken) {
+        if (serviceToken == null || !serviceToken.equals(internalServiceToken)) {
+            throw new InvalidCredentialsException("Credencial de serviço inválida ou ausente no cabeçalho X-Service-Token");
+        }
         findUserUseCase.findById(id);
         return ResponseEntity.ok().build();
     }
