@@ -87,12 +87,23 @@ Com os containers em execução, acesse as interfaces interativas no navegador:
 | `POST`   | `/api/v1/users/auth`       | Pública            | Valida credenciais (e-mail e senha) e retorna dados do usuário.        |
 | `GET`    | `/api/v1/users/{id}/exists`| Pública            | Validação rápida de existência de usuário (sem dados sensíveis).      |
 | `POST`   | `/api/v1/users/upload-csv` | Autenticada        | Importação em massa de usuários via upload de arquivo CSV.             |
-| `GET`    | `/api/v1/users`            | Autenticada        | Listagem paginada de usuários ativos (`page`, `size`, `sort`).         |
-| `GET`    | `/api/v1/users/deleted`    | Autenticada        | Listagem paginada de usuários excluídos logicamente com `deletedAt`.   |
+| `GET`    | `/api/v1/users`            | Autenticada (Dono) | Retorna listagem paginada restrita aos dados resumidos do próprio usuário autenticado. |
+| `GET`    | `/api/v1/users/deleted`    | Autenticada        | Listagem de usuários excluídos com `deletedAt` (sem CPF e sem telefone por privacidade). |
 | `GET`    | `/api/v1/users/{id}`       | Autenticada (Dono) | Busca os dados cadastrais do próprio usuário por UUID.                 |
 | `GET`    | `/api/v1/users/by-email`   | Autenticada (Dono) | Busca o próprio perfil do usuário pelo e-mail (case-insensitive).      |
 | `PUT`    | `/api/v1/users/{id}`       | Autenticada (Dono) | Atualiza nome, e-mail e celular do próprio usuário logado.             |
 | `DELETE` | `/api/v1/users/{id}`       | Autenticada (Dono) | Realiza exclusão lógica (_soft delete_) do próprio usuário logado.    |
+
+---
+
+### Análise de Risco e Segurança da Rota Inter-Serviços (`GET /api/v1/users/{id}/exists`)
+
+- **Propósito:** Comunicação síncrona de alta performance entre microsserviços (`ms-transaction` consultando `ms-user`) para validar se o titular da conta existe e está ativo antes de aprovar transações financeiras.
+- **Risco Identificado:** Como a rota não exige cabeçalho de autenticação, agentes externos poderiam tentar descobrir quais UUIDs existem no banco analisando a alternância entre `200 OK` e `404 Not Found` (enumeração de IDs).
+- **Fatores de Mitigação Implementados:**
+  1. **Alta Entropia do UUID v4:** O sistema adota exclusivamente UUID versão 4 (128 bits, dos quais 122 bits são puramente aleatórios, totalizando $5{,}3 \times 10^{36}$ combinações possíveis). Ataques de força bruta são estatisticamente inviáveis (probabilidade de acerto aleatório $< 10^{-18}$).
+  2. **Ausência de Dados Pessoais (Zero PII):** O endpoint retorna resposta vazia (`ResponseEntity<Void>` com `Content-Length: 0`). Mesmo se um UUID for inferido, nenhum dado confidencial (nome, CPF, e-mail, telefone ou saldo) é exposto.
+  3. **Recomendações para Produção Corporativa:** Em ambiente corporativo em nuvem, a rota deve ser isolada na sub-rede privada (VPC interna / Service Mesh) sem roteamento externo pelo API Gateway, ou autenticada via mTLS / cabeçalho com credencial de serviço (`X-Service-Token`).
 
 #### Exemplo de Payload para Cadastro (`POST /api/v1/users`):
 

@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
@@ -125,17 +126,24 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "Listar todos os usuários cadastrados (size = 10 por padrão)")
+    @Operation(summary = "Listar dados do usuário autenticado (restrito ao próprio usuário)",
+            description = "Retorna listagem paginada contendo estritamente os dados resumidos do usuário autenticado, prevenindo enumeração de outros clientes.")
     @GetMapping
-    public ResponseEntity<Page<UserSummaryDTO>> findAll(@ParameterObject @PageableDefault(size = 10) Pageable pageable) {
-        Page<User> usersDomain = findUserUseCase.findAll(pageable);
+    public ResponseEntity<Page<UserSummaryDTO>> findAll(@ParameterObject @PageableDefault(size = 10) Pageable pageable,
+                                                        @AuthenticationPrincipal UserSecurityDetails authenticatedUser) {
+        if (authenticatedUser == null) {
+            throw new AccessDeniedException("Autenticação necessária");
+        }
 
-        Page<UserSummaryDTO> response = usersDomain.map(user -> new UserSummaryDTO(
-                        user.getId(),
-                        user.getName(),
-                        user.getEmail()
-                ));
+        User user = findUserUseCase.findById(authenticatedUser.getId());
 
+        UserSummaryDTO summary = new UserSummaryDTO(
+                user.getId(),
+                user.getName(),
+                user.getEmail()
+        );
+
+        Page<UserSummaryDTO> response = new PageImpl<>(List.of(summary), pageable, 1);
         return ResponseEntity.ok(response);
     }
 
@@ -166,7 +174,9 @@ public class UserController {
     }
 
     @Operation(summary = "Verificar existência de usuário ativo (Inter-serviços)",
-            description = "Endpoint para validação inter-serviços. Retorna 200 se o usuário existe e está ativo, ou 404 se não encontrado ou inativo. Não expõe dados sensíveis.")
+            description = "Endpoint para validação síncrona inter-serviços. Retorna 200 se o usuário existe e está ativo, ou 404 se não encontrado ou inativo. " +
+                    "Decisão de segurança: Rota pública interna sem dados sensíveis (Void). A enumeração é mitigada pela alta entropia do UUID v4 (122 bits aleatórios). " +
+                    "Consulte a seção de Análise de Risco no README para detalhes.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário existe e está ativo"),
             @ApiResponse(responseCode = "404", description = "Usuário não localizado ou inativo")
@@ -243,22 +253,18 @@ public class UserController {
     }
 
     @Operation(summary = "Listar usuários excluídos do sistema",
-            description = "Retorna todos os usuários desativados (soft-deleted). Requer autenticação HTTP Basic.")
+            description = "Retorna histórico de usuários desativados (soft-deleted). Não expõe dados sensíveis (sem CPF e sem telefone). Requer autenticação HTTP Basic.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de usuários deletados retornada com sucesso")
     })
     @GetMapping("/deleted")
-    public ResponseEntity<Page<UserResponseDTO>> findDeleted(
+    public ResponseEntity<Page<DeletedUserResponseDTO>> findDeleted(
             @ParameterObject @PageableDefault(size = 10) Pageable pageable) {
         Page<User> deletedUsers = findUserUseCase.findAllDeleted(pageable);
-        Page<UserResponseDTO> response = deletedUsers.map(user -> new UserResponseDTO(
+        Page<DeletedUserResponseDTO> response = deletedUsers.map(user -> new DeletedUserResponseDTO(
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
-                user.getCpf(),
-                user.getPhone(),
-                user.getCreatedAt(),
-                user.getUpdatedAt(),
                 user.getDeletedAt()
         ));
 

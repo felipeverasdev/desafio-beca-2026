@@ -36,6 +36,9 @@ class UserControllerSecurityTest {
     @Autowired
     private CreateUserUseCase createUserUseCase;
 
+    @Autowired
+    private com.beca.ms_user.application.ports.in.DeleteUserUseCase deleteUserUseCase;
+
     private User userA;
     private User userB;
 
@@ -74,11 +77,39 @@ class UserControllerSecurityTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/deleted deve retornar 200 OK quando autenticado")
-    void shouldReturn200OnDeletedWithAuth() throws Exception {
+    @DisplayName("GET /api/v1/users/deleted deve retornar 200 OK sem expor CPF e telefone de usuários excluídos")
+    void shouldNotExposeCpfAndPhoneOnDeletedUsers() throws Exception {
+        // Exclui o userB para existir um usuário com soft-delete
+        deleteUserUseCase.delete(userB.getId());
+
         mockMvc.perform(get("/api/v1/users/deleted")
                         .with(httpBasic("usera@email.com", "senha123")))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].name").value("Usuario B"))
+                .andExpect(jsonPath("$.content[0].email").value("userb@email.com"))
+                .andExpect(jsonPath("$.content[0].deletedAt").exists())
+                .andExpect(jsonPath("$.content[0].cpf").doesNotExist())
+                .andExpect(jsonPath("$.content[0].phone").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users deve retornar 401 Unauthorized sem credenciais")
+    void shouldReturn401OnFindAllWithoutAuth() throws Exception {
+        mockMvc.perform(get("/api/v1/users"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users deve listar apenas o próprio usuário autenticado e não expor outros usuários")
+    void shouldListOnlyAuthenticatedUserOnFindAll() throws Exception {
+        mockMvc.perform(get("/api/v1/users")
+                        .with(httpBasic("usera@email.com", "senha123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(userA.getId().toString()))
+                .andExpect(jsonPath("$.content[0].name").value("Usuario A"))
+                .andExpect(jsonPath("$.content[0].email").value("usera@email.com"));
     }
 
     @Test
