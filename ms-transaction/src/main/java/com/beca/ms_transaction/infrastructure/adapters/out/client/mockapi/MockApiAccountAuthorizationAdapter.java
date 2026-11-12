@@ -42,9 +42,6 @@ public class MockApiAccountAuthorizationAdapter implements AccountAuthorizationP
             List<MockApiUserAccountDTO> accounts = restClient.get()
                     .uri(mockApiUrl + "?userId={userId}", userId.toString())
                     .retrieve()
-                    .onStatus(HttpStatusCode::is4xxClientError, (req, resp) -> {
-                        log.warn("MockAPI retornou status {} ao consultar usuário {}", resp.getStatusCode(), userId);
-                    })
                     .body(new ParameterizedTypeReference<List<MockApiUserAccountDTO>>() {});
 
             if (accounts == null || accounts.isEmpty()) {
@@ -61,6 +58,7 @@ public class MockApiAccountAuthorizationAdapter implements AccountAuthorizationP
 
         } catch (RestClientResponseException ex) {
             if (ex.getStatusCode().value() == 404) {
+                log.debug("MockAPI retornou 404 (conta não encontrada) para userId {}", userId);
                 return Optional.empty();
             }
             log.error("Erro retornado pelo MockAPI ao consultar userId {}: {}", userId, ex.getMessage());
@@ -104,6 +102,13 @@ public class MockApiAccountAuthorizationAdapter implements AccountAuthorizationP
                     .toBodilessEntity();
 
             log.info("Saldo atualizado no MockAPI para userId {}: novo saldo = R$ {}", userId, newBalance);
+        } catch (RestClientResponseException ex) {
+            if (ex.getStatusCode().value() == 404) {
+                log.warn("Conta inexistente na MockAPI para userId {}", userId);
+                return;
+            }
+            log.error("Erro retornado pelo MockAPI ao atualizar userId {}: {}", userId, ex.getMessage());
+            throw new ExternalServiceUnavailableException("Falha ao atualizar saldo no serviço autorizador (MockAPI)");
         } catch (Exception ex) {
             log.error("Erro ao atualizar saldo no MockAPI para userId {}: {}", userId, ex.getMessage());
             throw new ExternalServiceUnavailableException("Falha ao atualizar saldo no serviço autorizador (MockAPI)");
