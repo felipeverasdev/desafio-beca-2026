@@ -46,7 +46,7 @@ public class UserController {
                           DeleteUserUseCase deleteUserUseCase,
                           AuthenticateUserUseCase authenticateUserUseCase,
                           ImportUsersCsvUseCase importUsersCsvUseCase,
-                          @Value("${services.internal.token:beca-internal-token-secret-2026}") String internalServiceToken) {
+                          @Value("${services.internal.token}") String internalServiceToken) {
         this.createUserUseCase = createUserUseCase;
         this.findUserUseCase = findUserUseCase;
         this.updateUserUseCase = updateUserUseCase;

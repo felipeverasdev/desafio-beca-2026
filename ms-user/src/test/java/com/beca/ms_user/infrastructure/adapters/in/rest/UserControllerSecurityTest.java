@@ -206,7 +206,7 @@ class UserControllerSecurityTest {
     @DisplayName("GET /api/v1/users/{id}/exists deve retornar 200 OK com token de serviço válido para usuário ativo")
     void shouldReturn200OnExistsWithValidServiceToken() throws Exception {
         mockMvc.perform(get("/api/v1/users/{id}/exists", userA.getId())
-                        .header("X-Service-Token", "beca-internal-token-secret-2026"))
+                        .header("X-Service-Token", "test-service-token-secret-123456"))
                 .andExpect(status().isOk());
     }
 
@@ -214,7 +214,7 @@ class UserControllerSecurityTest {
     @DisplayName("GET /api/v1/users/{id}/exists deve retornar 404 Not Found com token válido para usuário inexistente")
     void shouldReturn404OnExistsWithValidServiceTokenWhenUserNotFound() throws Exception {
         mockMvc.perform(get("/api/v1/users/{id}/exists", UUID.randomUUID())
-                        .header("X-Service-Token", "beca-internal-token-secret-2026"))
+                        .header("X-Service-Token", "test-service-token-secret-123456"))
                 .andExpect(status().isNotFound());
     }
 
