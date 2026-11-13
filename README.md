@@ -89,8 +89,7 @@ Com os containers em execução, acesse as interfaces interativas no navegador:
 | `POST`   | `/api/v1/users/auth`        | Pública                    | Valida credenciais (e-mail e senha) e retorna dados do usuário.        |
 | `GET`    | `/api/v1/users/{id}/exists` | Token (`X-Service-Token`)  | Validação inter-serviços de existência/status ativo (retorno `Void`).  |
 | `POST`   | `/api/v1/users/upload-csv`  | Autenticada                | Importação em massa de usuários via upload de arquivo CSV.             |
-| `GET`    | `/api/v1/users/deleted`     | Autenticada                | Listagem de usuários excluídos com `deletedAt` (sem CPF e sem telefone).|
-| `GET`    | `/api/v1/users/{id}`        | Autenticada (Dono)         | Busca os dados cadastrais do próprio usuário por UUID.                 |
+| `GET`    | `/api/v1/users/{id}`        | Autenticada (Dono)         | Busca os dados cadastrais do próprio usuário por UUID (CPF mascarado). |
 | `GET`    | `/api/v1/users/by-email`    | Autenticada (Dono)         | Busca o próprio perfil do usuário pelo e-mail (case-insensitive).      |
 | `PUT`    | `/api/v1/users/{id}`        | Autenticada (Dono)         | Atualiza nome e celular do próprio usuário logado (e-mail é imutável). |
 | `DELETE` | `/api/v1/users/{id}`        | Autenticada (Dono)         | Realiza exclusão lógica (_soft delete_) do próprio usuário logado.    |

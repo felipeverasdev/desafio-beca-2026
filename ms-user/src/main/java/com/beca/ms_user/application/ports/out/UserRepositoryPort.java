@@ -14,6 +14,7 @@ public interface UserRepositoryPort {
     Optional<User> findById(UUID id);
     Optional<User> findByEmail(String email);
     Optional<User> findByCpf(String cpf);
+    Optional<User> findByPhone(String phone);
     Page<User> findAll(Pageable pageable);
     Page<User> findAllDeleted(Pageable pageable);
 }

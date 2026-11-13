@@ -88,7 +88,7 @@ public class GlobalExceptionHandler {
                 Instant.now(),
                 status.value(),
                 "Data Integrity Violation",
-                "Violação de integridade de dados. O registro já existe ou viola restrições do banco.",
+                "Os dados informados entram em conflito com um registro existente.",
                 request.getRequestURI()
         );
 
@@ -131,6 +131,74 @@ public class GlobalExceptionHandler {
                 status.value(),
                 "Forbidden",
                 e.getMessage() != null ? e.getMessage() : "Acesso negado",
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(status).body(err);
+    }
+
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<StandardError> handleMethodArgumentTypeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException e, HttpServletRequest request) {
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        StandardError err = new StandardError(
+                Instant.now(),
+                status.value(),
+                "Bad Request",
+                "Parâmetro inválido '" + e.getName() + "': " + e.getValue(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(status).body(err);
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<StandardError> handleMethodNotSupported(org.springframework.web.HttpRequestMethodNotSupportedException e, HttpServletRequest request) {
+        HttpStatus status = HttpStatus.METHOD_NOT_ALLOWED;
+        StandardError err = new StandardError(
+                Instant.now(),
+                status.value(),
+                "Method Not Allowed",
+                "Método HTTP não suportado para esta rota: " + e.getMethod(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(status).body(err);
+    }
+
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<StandardError> handleNoResourceFound(org.springframework.web.servlet.resource.NoResourceFoundException e, HttpServletRequest request) {
+        HttpStatus status = HttpStatus.NOT_FOUND;
+        StandardError err = new StandardError(
+                Instant.now(),
+                status.value(),
+                "Resource not found",
+                "Recurso não encontrado: " + e.getResourcePath(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(status).body(err);
+    }
+
+    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+    public ResponseEntity<StandardError> handleDataAccessException(org.springframework.dao.DataAccessException e, HttpServletRequest request) {
+        log.error("Erro de acesso a dados na requisição [{}]: {}", request.getRequestURI(), e.getMessage(), e);
+        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
+        StandardError err = new StandardError(
+                Instant.now(),
+                status.value(),
+                "Data Error",
+                "Ocorreu um erro no processamento dos dados. Tente novamente mais tarde.",
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(status).body(err);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<StandardError> handleGeneralException(Exception e, HttpServletRequest request) {
+        log.error("Erro interno inesperado no servidor na requisição [{}]: {}", request.getRequestURI(), e.getMessage(), e);
+        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
+        StandardError err = new StandardError(
+                Instant.now(),
+                status.value(),
+                "Internal Server Error",
+                "Ocorreu um erro interno no processamento da sua solicitação. Tente novamente mais tarde.",
                 request.getRequestURI()
         );
 

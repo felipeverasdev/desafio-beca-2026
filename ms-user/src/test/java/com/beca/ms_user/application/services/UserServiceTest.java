@@ -71,6 +71,7 @@ class UserServiceTest {
     void shouldCreateUserSuccessfully() {
         when(userRepositoryPort.findByEmail(createCommand.email())).thenReturn(Optional.empty());
         when(userRepositoryPort.findByCpf(createCommand.cpf())).thenReturn(Optional.empty());
+        when(userRepositoryPort.findByPhone(createCommand.phone())).thenReturn(Optional.empty());
         when(passwordEncoderPort.encode("minhaSenha123")).thenReturn("$2a$10$encodedHash");
         when(userRepositoryPort.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -107,6 +108,21 @@ class UserServiceTest {
                 userService.create(createCommand));
 
         assertEquals("CPF já cadastrado no sistema.", ex.getMessage());
+        verify(userRepositoryPort, never()).save(any());
+        verify(passwordEncoderPort, never()).encode(anyString());
+    }
+
+    @Test
+    @DisplayName("Deve lançar ResourceAlreadyExistsException quando o telefone já estiver cadastrado")
+    void shouldThrowExceptionWhenPhoneAlreadyExists() {
+        when(userRepositoryPort.findByEmail(createCommand.email())).thenReturn(Optional.empty());
+        when(userRepositoryPort.findByCpf(createCommand.cpf())).thenReturn(Optional.empty());
+        when(userRepositoryPort.findByPhone(createCommand.phone())).thenReturn(Optional.of(sampleUser));
+
+        ResourceAlreadyExistsException ex = assertThrows(ResourceAlreadyExistsException.class, () ->
+                userService.create(createCommand));
+
+        assertEquals("Telefone já cadastrado no sistema.", ex.getMessage());
         verify(userRepositoryPort, never()).save(any());
         verify(passwordEncoderPort, never()).encode(anyString());
     }
@@ -172,6 +188,7 @@ class UserServiceTest {
         UpdateUserCommand updateCommand = new UpdateUserCommand("João Atualizado", "5511900001111");
 
         when(userRepositoryPort.findById(id)).thenReturn(Optional.of(sampleUser));
+        when(userRepositoryPort.findByPhone("5511900001111")).thenReturn(Optional.empty());
         when(userRepositoryPort.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         User updated = userService.update(id, updateCommand);
@@ -180,6 +197,23 @@ class UserServiceTest {
         assertEquals(sampleUser.getEmail(), updated.getEmail());
         assertEquals("5511900001111", updated.getPhone());
         verify(userRepositoryPort).save(sampleUser);
+    }
+
+    @Test
+    @DisplayName("Deve lançar ResourceAlreadyExistsException quando o telefone atualizado já pertencer a outro usuário")
+    void shouldThrowExceptionWhenPhoneAlreadyExistsOnUpdate() {
+        UUID id = sampleUser.getId();
+        UpdateUserCommand updateCommand = new UpdateUserCommand("João Atualizado", "5511999998888");
+        User otherUser = new User(UUID.randomUUID(), "Outro", "outro@email.com", "hash", "98765432100", "5511999998888", java.time.OffsetDateTime.now(), java.time.OffsetDateTime.now(), null);
+
+        when(userRepositoryPort.findById(id)).thenReturn(Optional.of(sampleUser));
+        when(userRepositoryPort.findByPhone("5511999998888")).thenReturn(Optional.of(otherUser));
+
+        ResourceAlreadyExistsException ex = assertThrows(ResourceAlreadyExistsException.class, () ->
+                userService.update(id, updateCommand));
+
+        assertEquals("Telefone já cadastrado no sistema.", ex.getMessage());
+        verify(userRepositoryPort, never()).save(sampleUser);
     }
 
     @Test
@@ -238,6 +272,7 @@ class UserServiceTest {
 
         when(userRepositoryPort.findByEmail(anyString())).thenReturn(Optional.empty());
         when(userRepositoryPort.findByCpf(anyString())).thenReturn(Optional.empty());
+        when(userRepositoryPort.findByPhone(anyString())).thenReturn(Optional.empty());
         when(passwordEncoderPort.encode(anyString())).thenReturn("hashedPass");
         when(userRepositoryPort.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -263,6 +298,7 @@ class UserServiceTest {
 
         when(userRepositoryPort.findByEmail(anyString())).thenReturn(Optional.empty());
         when(userRepositoryPort.findByCpf(anyString())).thenReturn(Optional.empty());
+        when(userRepositoryPort.findByPhone(anyString())).thenReturn(Optional.empty());
         when(passwordEncoderPort.encode(anyString())).thenReturn("hashedPass");
         when(userRepositoryPort.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -289,6 +325,7 @@ class UserServiceTest {
 
         when(userRepositoryPort.findByEmail(anyString())).thenReturn(Optional.empty());
         when(userRepositoryPort.findByCpf(anyString())).thenReturn(Optional.empty());
+        when(userRepositoryPort.findByPhone(anyString())).thenReturn(Optional.empty());
         when(passwordEncoderPort.encode(anyString())).thenReturn("hashedPass");
         when(userRepositoryPort.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 

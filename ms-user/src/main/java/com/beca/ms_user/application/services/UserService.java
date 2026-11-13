@@ -32,14 +32,18 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
     @Override
     @Transactional
     public User create(CreateUserCommand command) {
-        // Duplicate emails/CPFs are not allowed.
+        // Duplicate emails/CPFs/phones are not allowed.
         userRepositoryPort.findByEmail(command.email())
                 .ifPresent(u -> {
-                    throw  new ResourceAlreadyExistsException("E-mail já cadastrado no sistema.");
+                    throw new ResourceAlreadyExistsException("E-mail já cadastrado no sistema.");
                 });
         userRepositoryPort.findByCpf(command.cpf())
                 .ifPresent(u -> {
                     throw new ResourceAlreadyExistsException("CPF já cadastrado no sistema.");
+                });
+        userRepositoryPort.findByPhone(command.phone())
+                .ifPresent(u -> {
+                    throw new ResourceAlreadyExistsException("Telefone já cadastrado no sistema.");
                 });
 
         String encodedPassword = passwordEncoderPort.encode(command.password());
@@ -87,6 +91,15 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
     @Transactional
     public User update(UUID id, UpdateUserCommand command) {
         User currentUser = findById(id);
+
+        if (!currentUser.getPhone().equals(command.phone())) {
+            userRepositoryPort.findByPhone(command.phone())
+                    .ifPresent(existing -> {
+                        if (existing.getId() == null || !existing.getId().equals(id)) {
+                            throw new ResourceAlreadyExistsException("Telefone já cadastrado no sistema.");
+                        }
+                    });
+        }
 
         currentUser.updatePersonalData(command.name(), command.phone());
 

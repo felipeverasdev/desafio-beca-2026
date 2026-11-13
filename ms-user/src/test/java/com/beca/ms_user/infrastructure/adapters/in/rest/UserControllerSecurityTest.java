@@ -69,27 +69,12 @@ class UserControllerSecurityTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/deleted deve retornar 401 Unauthorized sem credenciais")
-    void shouldReturn401OnDeletedWithoutAuth() throws Exception {
-        mockMvc.perform(get("/api/v1/users/deleted"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.status").value(401));
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/users/deleted deve retornar 200 OK sem expor CPF e telefone de usuários excluídos")
-    void shouldNotExposeCpfAndPhoneOnDeletedUsers() throws Exception {
-        // Exclui o userB para existir um usuário com soft-delete
-        deleteUserUseCase.delete(userB.getId());
-
+    @DisplayName("GET /api/v1/users/deleted deve retornar 400 Bad Request pois o endpoint foi desativado e o parâmetro não é um UUID válido")
+    void shouldReturn400WhenAccessingDeletedEndpoint() throws Exception {
         mockMvc.perform(get("/api/v1/users/deleted")
                         .with(httpBasic("usera@email.com", "senha123")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].name").value("Usuario B"))
-                .andExpect(jsonPath("$.content[0].email").value("userb@email.com"))
-                .andExpect(jsonPath("$.content[0].deletedAt").exists())
-                .andExpect(jsonPath("$.content[0].cpf").doesNotExist())
-                .andExpect(jsonPath("$.content[0].phone").doesNotExist());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
     }
 
     @Test
@@ -118,13 +103,14 @@ class UserControllerSecurityTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/{id} deve retornar 200 OK quando usuário autenticado consultar a si mesmo")
+    @DisplayName("GET /api/v1/users/{id} deve retornar 200 OK com CPF mascarado quando usuário autenticado consultar a si mesmo")
     void shouldReturn200WhenUserConsultsSelfById() throws Exception {
         mockMvc.perform(get("/api/v1/users/{id}", userA.getId())
                         .with(httpBasic("usera@email.com", "senha123")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(userA.getId().toString()))
-                .andExpect(jsonPath("$.email").value("usera@email.com"));
+                .andExpect(jsonPath("$.email").value("usera@email.com"))
+                .andExpect(jsonPath("$.cpf").value("***.456.789-**"));
     }
 
     @Test
@@ -214,6 +200,15 @@ class UserControllerSecurityTest {
     }
 
     @Test
+    @DisplayName("GET /api/v1/users/{id}/exists deve retornar 401 Unauthorized com token de serviço vazio")
+    void shouldReturn401OnExistsWithEmptyServiceToken() throws Exception {
+        mockMvc.perform(get("/api/v1/users/{id}/exists", userA.getId())
+                        .header("X-Service-Token", ""))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
     @DisplayName("GET /api/v1/users/{id}/exists deve retornar 401 Unauthorized com token de serviço inválido")
     void shouldReturn401OnExistsWithInvalidServiceToken() throws Exception {
         mockMvc.perform(get("/api/v1/users/{id}/exists", userA.getId())
@@ -258,5 +253,26 @@ class UserControllerSecurityTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.errors[0].fieldName").value("name"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/users deve retornar 409 Conflict quando telefone já estiver cadastrado")
+    void shouldReturn409WhenPhoneAlreadyExists() throws Exception {
+        String payload = """
+                {
+                    "name": "Novo Usuario",
+                    "email": "novousuario@email.com",
+                    "password": "senhaForte123",
+                    "cpf": "99988877766",
+                    "phone": "5511987654321"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message").value("Telefone já cadastrado no sistema."));
     }
 }

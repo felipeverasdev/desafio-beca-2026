@@ -168,7 +168,9 @@ public class UserController {
     public ResponseEntity<Void> checkExists(
             @PathVariable UUID id,
             @RequestHeader(value = "X-Service-Token", required = false) String serviceToken) {
-        if (serviceToken == null || !serviceToken.equals(internalServiceToken)) {
+        if (internalServiceToken == null || internalServiceToken.isBlank()
+                || serviceToken == null || serviceToken.isBlank()
+                || !internalServiceToken.equals(serviceToken.trim())) {
             throw new InvalidCredentialsException("Credencial de serviço inválida ou ausente no cabeçalho X-Service-Token");
         }
         findUserUseCase.findById(id);
@@ -239,25 +241,6 @@ public class UserController {
 
         deleteUserUseCase.delete(id);
         return ResponseEntity.noContent().build();
-    }
-
-    @Operation(summary = "Listar usuários excluídos do sistema",
-            description = "Retorna histórico de usuários desativados (soft-deleted). Não expõe dados sensíveis (sem CPF e sem telefone). Requer autenticação HTTP Basic.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Lista de usuários deletados retornada com sucesso")
-    })
-    @GetMapping("/deleted")
-    public ResponseEntity<Page<DeletedUserResponseDTO>> findDeleted(
-            @ParameterObject @PageableDefault(size = 10) Pageable pageable) {
-        Page<User> deletedUsers = findUserUseCase.findAllDeleted(pageable);
-        Page<DeletedUserResponseDTO> response = deletedUsers.map(user -> new DeletedUserResponseDTO(
-                user.getId(),
-                user.getName(),
-                user.getEmail(),
-                user.getDeletedAt()
-        ));
-
-        return ResponseEntity.ok(response);
     }
 
     private void validateOwnership(UserSecurityDetails authenticatedUser, UUID targetId) {
