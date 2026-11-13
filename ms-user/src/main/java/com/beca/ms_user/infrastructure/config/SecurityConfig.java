@@ -11,6 +11,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 
 import java.time.Instant;
@@ -26,6 +27,15 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        AuthenticationEntryPoint authenticationEntryPoint = (request, response, authException) -> {
+            response.setContentType("application/json;charset=UTF-8");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("""
+                    {"timestamp":"%s","status":401,"error":"Unauthorized","message":"Autenticação necessária ou credenciais inválidas","path":"%s"}
+                    """.formatted(Instant.now(), request.getRequestURI()));
+            response.getWriter().flush();
+        };
+
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -45,17 +55,9 @@ public class SecurityConfig {
                         // Todas as demais rotas requerem autenticação (HTTP Basic)
                         .anyRequest().authenticated()
                 )
-                .httpBasic(Customizer.withDefaults())
+                .httpBasic(httpBasic -> httpBasic.authenticationEntryPoint(authenticationEntryPoint))
                 .exceptionHandling(exceptions -> exceptions
-                        .authenticationEntryPoint((request, response, authException) -> {
-                            response.setHeader("WWW-Authenticate", "Basic realm=\"ms-user\"");
-                            response.setContentType("application/json;charset=UTF-8");
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.getWriter().write("""
-                                    {"timestamp":"%s","status":401,"error":"Unauthorized","message":"Autenticação necessária ou credenciais inválidas","path":"%s"}
-                                    """.formatted(Instant.now(), request.getRequestURI()));
-                            response.getWriter().flush();
-                        })
+                        .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
                             response.setContentType("application/json;charset=UTF-8");
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
