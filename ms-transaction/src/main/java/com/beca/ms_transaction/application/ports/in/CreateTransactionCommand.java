@@ -33,6 +33,9 @@ public record CreateTransactionCommand(
                 throw new InvalidTransactionException("Não é permitido transferir para a mesma conta");
             }
         }
+        if (type == TransactionType.PURCHASE && category == null) {
+            throw new InvalidTransactionException("A categoria da despesa é obrigatória para compras");
+        }
         if (category == null) {
             category = TransactionCategory.OUTROS;
         }

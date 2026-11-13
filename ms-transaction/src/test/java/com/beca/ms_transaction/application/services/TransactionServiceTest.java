@@ -245,8 +245,8 @@ class TransactionServiceTest {
     }
 
     @Test
-    @DisplayName("Deve rejeitar transação quando MockAPI estiver fora do ar (KAN-9)")
-    void shouldRejectWhenMockApiUnavailable() {
+    @DisplayName("Deve lançar ExternalServiceUnavailableException quando MockAPI estiver fora do ar")
+    void shouldThrowExternalServiceUnavailableExceptionWhenMockApiUnavailable() {
         UUID userId = UUID.randomUUID();
         CreateTransactionCommand command = new CreateTransactionCommand(
                 userId,
@@ -259,12 +259,9 @@ class TransactionServiceTest {
 
         when(userValidationPort.existsAndActive(userId)).thenReturn(true);
         when(accountAuthorizationPort.findAccountBalance(userId)).thenThrow(new ExternalServiceUnavailableException("Timeout MockAPI"));
-        when(transactionRepositoryPort.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Transaction result = transactionService.execute(command);
-
-        assertEquals(TransactionStatus.REJECTED, result.getStatus());
-        assertEquals("Serviço autorizador indisponível no momento", result.getRejectionReason());
+        assertThrows(ExternalServiceUnavailableException.class, () -> transactionService.execute(command));
+        verify(transactionRepositoryPort, never()).save(any());
     }
 
     @Test

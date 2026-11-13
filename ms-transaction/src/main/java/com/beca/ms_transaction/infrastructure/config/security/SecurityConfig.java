@@ -21,7 +21,6 @@ public class SecurityConfig {
     @Bean
     public AuthenticationEntryPoint authenticationEntryPoint() {
         return (request, response, authException) -> {
-            response.setHeader("WWW-Authenticate", "Basic realm=\"ms-transaction\"");
             response.setContentType("application/json;charset=UTF-8");
 
             Throwable rootCause = authException;

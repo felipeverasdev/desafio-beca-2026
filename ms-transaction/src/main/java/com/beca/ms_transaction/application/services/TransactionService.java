@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
@@ -61,6 +62,7 @@ public class TransactionService implements CreateTransactionUseCase, SearchTrans
     }
 
     @Override
+    @Transactional
     public Transaction execute(CreateTransactionCommand command) {
         if (command == null || command.userId() == null || command.type() == null || command.amount() == null) {
             throw new InvalidTransactionException("Parâmetros obrigatórios da transação não fornecidos");
@@ -86,8 +88,15 @@ public class TransactionService implements CreateTransactionUseCase, SearchTrans
             throw new InvalidTransactionException("A categoria da despesa é obrigatória para compras");
         }
 
-        // Depósitos são aprovados diretamente sem consulta a limites e creditados na MockAPI
+        // Depósitos: credita na MockAPI e persiste transação aprovada
         if (command.type() == TransactionType.DEPOSIT) {
+            BigDecimal currentBalance = BigDecimal.ZERO;
+            Optional<AccountBalance> accOpt = accountAuthorizationPort.findAccountBalance(command.userId());
+            if (accOpt.isPresent() && accOpt.get().balance() != null) {
+                currentBalance = accOpt.get().balance();
+            }
+            accountAuthorizationPort.updateBalance(command.userId(), currentBalance.add(command.amount()));
+
             Transaction deposit = Transaction.createApproved(
                     command.userId(),
                     command.type(),
@@ -96,33 +105,11 @@ public class TransactionService implements CreateTransactionUseCase, SearchTrans
                     command.description(),
                     command.targetUserId()
             );
-            Transaction saved = transactionRepositoryPort.save(deposit);
-            BigDecimal currentBalance = BigDecimal.ZERO;
-            Optional<AccountBalance> accOpt = accountAuthorizationPort.findAccountBalance(command.userId());
-            if (accOpt.isPresent() && accOpt.get().balance() != null) {
-                currentBalance = accOpt.get().balance();
-            }
-            accountAuthorizationPort.updateBalance(command.userId(), currentBalance.add(command.amount()));
-            return saved;
+            return transactionRepositoryPort.save(deposit);
         }
 
         // Para saques, transferências e compras: validação de saldo e limites via API Mock
-        Optional<AccountBalance> accountOpt;
-        try {
-            accountOpt = accountAuthorizationPort.findAccountBalance(command.userId());
-        } catch (ExternalServiceUnavailableException ex) {
-            // Se a API Mock estiver indisponível, a transação não é aprovada às cegas; é rejeitada e registrada
-            Transaction rejected = Transaction.createRejected(
-                    command.userId(),
-                    command.type(),
-                    command.amount(),
-                    command.category(),
-                    command.description(),
-                    command.targetUserId(),
-                    "Serviço autorizador indisponível no momento"
-            );
-            return transactionRepositoryPort.save(rejected);
-        }
+        Optional<AccountBalance> accountOpt = accountAuthorizationPort.findAccountBalance(command.userId());
 
         if (accountOpt.isEmpty()) {
             Transaction rejected = Transaction.createRejected(
@@ -191,18 +178,7 @@ public class TransactionService implements CreateTransactionUseCase, SearchTrans
             }
         }
 
-        // Todas as validações aprovadas
-        Transaction approved = Transaction.createApproved(
-                command.userId(),
-                command.type(),
-                command.amount(),
-                command.category(),
-                command.description(),
-                command.targetUserId()
-        );
-        Transaction saved = transactionRepositoryPort.save(approved);
-
-        // Atualiza (debita) saldo na MockAPI para a conta originadora
+        // Atualiza (debita) saldo na MockAPI para a conta originadora ANTES de salvar a aprovação
         BigDecimal currentBalance = account.balance() != null ? account.balance() : BigDecimal.ZERO;
         BigDecimal newBalance = currentBalance.subtract(command.amount());
         accountAuthorizationPort.updateBalance(command.userId(), newBalance);
@@ -215,7 +191,16 @@ public class TransactionService implements CreateTransactionUseCase, SearchTrans
             });
         }
 
-        return saved;
+        // Todas as validações aprovadas e débito realizado com sucesso: persiste aprovação
+        Transaction approved = Transaction.createApproved(
+                command.userId(),
+                command.type(),
+                command.amount(),
+                command.category(),
+                command.description(),
+                command.targetUserId()
+        );
+        return transactionRepositoryPort.save(approved);
     }
 
     @Override

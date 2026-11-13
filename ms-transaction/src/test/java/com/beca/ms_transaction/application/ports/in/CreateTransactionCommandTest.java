@@ -78,5 +78,16 @@ class CreateTransactionCommandTest {
         assertThrows(InvalidTransactionException.class, () ->
                 new CreateTransactionCommand(userId, TransactionType.TRANSFER, BigDecimal.TEN, null, null, userId));
     }
+
+    @Test
+    @DisplayName("Deve lançar exceção se compra (PURCHASE) não possuir categoria definida")
+    void shouldThrowExceptionWhenPurchaseHasNoCategory() {
+        UUID userId = UUID.randomUUID();
+
+        InvalidTransactionException ex = assertThrows(InvalidTransactionException.class, () ->
+                new CreateTransactionCommand(userId, TransactionType.PURCHASE, BigDecimal.TEN, null, "Compras", null));
+
+        assertEquals("A categoria da despesa é obrigatória para compras", ex.getMessage());
+    }
 }
 
