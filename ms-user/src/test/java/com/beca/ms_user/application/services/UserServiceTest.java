@@ -166,34 +166,20 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("Deve atualizar dados pessoais de um usuário existente")
+    @DisplayName("Deve atualizar dados pessoais de um usuário existente (mantendo o e-mail inalterado)")
     void shouldUpdateUserSuccessfully() {
         UUID id = sampleUser.getId();
-        UpdateUserCommand updateCommand = new UpdateUserCommand("João Atualizado", "joao.novo@email.com", "5511900001111");
+        UpdateUserCommand updateCommand = new UpdateUserCommand("João Atualizado", "5511900001111");
 
         when(userRepositoryPort.findById(id)).thenReturn(Optional.of(sampleUser));
-        when(userRepositoryPort.findByEmail("joao.novo@email.com")).thenReturn(Optional.empty());
         when(userRepositoryPort.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         User updated = userService.update(id, updateCommand);
 
         assertEquals("João Atualizado", updated.getName());
-        assertEquals("joao.novo@email.com", updated.getEmail());
+        assertEquals(sampleUser.getEmail(), updated.getEmail());
         assertEquals("5511900001111", updated.getPhone());
         verify(userRepositoryPort).save(sampleUser);
-    }
-
-    @Test
-    @DisplayName("Deve lançar ResourceAlreadyExistsException quando tentar atualizar para um e-mail já existente")
-    void shouldThrowExceptionWhenUpdatingToExistingEmail() {
-        UUID id = sampleUser.getId();
-        UpdateUserCommand updateCommand = new UpdateUserCommand("João Atualizado", "outro@email.com", "5511900001111");
-
-        when(userRepositoryPort.findById(id)).thenReturn(Optional.of(sampleUser));
-        when(userRepositoryPort.findByEmail("outro@email.com")).thenReturn(Optional.of(sampleUser));
-
-        assertThrows(ResourceAlreadyExistsException.class, () -> userService.update(id, updateCommand));
-        verify(userRepositoryPort, never()).save(any());
     }
 
     @Test

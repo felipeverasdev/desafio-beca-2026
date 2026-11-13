@@ -88,15 +88,7 @@ public class UserService implements CreateUserUseCase, FindUserUseCase, UpdateUs
     public User update(UUID id, UpdateUserCommand command) {
         User currentUser = findById(id);
 
-        String normalizedEmail = command.email().trim().toLowerCase();
-        if (!currentUser.getEmail().equalsIgnoreCase(normalizedEmail)) {
-            userRepositoryPort.findByEmail(normalizedEmail)
-                    .ifPresent(u -> {
-                        throw new ResourceAlreadyExistsException("E-mail já cadastrado no sistema.");
-                    });
-        }
-
-        currentUser.updatePersonalData(command.name(), normalizedEmail, command.phone());
+        currentUser.updatePersonalData(command.name(), command.phone());
 
         return userRepositoryPort.save(currentUser);
     }

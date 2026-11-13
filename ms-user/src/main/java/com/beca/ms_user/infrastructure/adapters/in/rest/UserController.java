@@ -203,7 +203,8 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "Atualizar dados de um usuário existente")
+    @Operation(summary = "Atualizar dados de um usuário existente",
+            description = "Permite a atualização de nome e celular do próprio usuário autenticado. O e-mail é imutável e não pode ser alterado por este endpoint.")
     @PutMapping("/{id}")
     public ResponseEntity<UserResponseDTO> update(@PathVariable UUID id,
                                                   @RequestBody @Valid UserUpdateDTO dto,
@@ -211,7 +212,7 @@ public class UserController {
         validateOwnership(authenticatedUser, id);
 
         UpdateUserCommand updated = new UpdateUserCommand(
-                dto.name().trim(), dto.email().trim().toLowerCase(), dto.phone().trim()
+                dto.name().trim(), dto.phone().trim()
         );
         User saved = updateUserUseCase.update(id, updated);
 

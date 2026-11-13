@@ -158,12 +158,32 @@ class UserControllerSecurityTest {
     }
 
     @Test
+    @DisplayName("PUT /api/v1/users/{id} deve retornar 200 OK quando usuário atualizar seu próprio perfil")
+    void shouldReturn200WhenUserUpdatesSelf() throws Exception {
+        String updatePayload = """
+                {
+                    "name": "User A Atualizado",
+                    "phone": "5511988887777"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/users/{id}", userA.getId())
+                        .with(httpBasic("usera@email.com", "senha123"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userA.getId().toString()))
+                .andExpect(jsonPath("$.name").value("User A Atualizado"))
+                .andExpect(jsonPath("$.email").value("usera@email.com"))
+                .andExpect(jsonPath("$.phone").value("5511988887777"));
+    }
+
+    @Test
     @DisplayName("PUT /api/v1/users/{id} deve retornar 403 Forbidden quando usuário tentar alterar dados de outro")
     void shouldReturn403WhenUserUpdatesAnother() throws Exception {
         String updatePayload = """
                 {
                     "name": "Nome Alterado",
-                    "email": "usera@email.com",
                     "phone": "5511987654321"
                 }
                 """;
