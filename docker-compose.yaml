@@ -5,17 +5,17 @@ services:
     container_name: ms-user-db
     restart: always
     environment:
-      POSTGRES_DB: user_db
-      POSTGRES_USER: ${MS_USERS_DB_USER:-user_admin}
-      POSTGRES_PASSWORD: ${MS_USERS_DB_PASS:-123456}
+      POSTGRES_DB: ${MS_USERS_DB_NAME}
+      POSTGRES_USER: ${MS_USERS_DB_USER}
+      POSTGRES_PASSWORD: ${MS_USERS_DB_PASS}
     ports:
-      - "${MS_USERS_DB_PORT:-5434}:5432"
+      - "${MS_USERS_DB_PORT}:5432"
     volumes:
       - user_db_data:/var/lib/postgresql/data
     networks:
       - beca-network
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${MS_USERS_DB_USER:-user_admin} -d user_db" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${MS_USERS_DB_USER} -d ${MS_USERS_DB_NAME}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,12 +28,12 @@ services:
     container_name: ms-user
     restart: always
     ports:
-      - "${MS_USERS_PORT:-8081}:8081"
+      - "${MS_USERS_PORT}:8081"
     environment:
-      - MS_USERS_DB_URL=jdbc:postgresql://user-db:5432/user_db
-      - MS_USERS_DB_USER=${MS_USERS_DB_USER:-user_admin}
-      - MS_USERS_DB_PASS=${MS_USERS_DB_PASS:-123456}
-      - SERVER_PORT=8081
+      - MS_USERS_DB_URL=jdbc:postgresql://user-db:5432/${MS_USERS_DB_NAME}
+      - MS_USERS_DB_USER=${MS_USERS_DB_USER}
+      - MS_USERS_DB_PASS=${MS_USERS_DB_PASS}
+      - SERVER_PORT=${MS_USERS_PORT}
       - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
     depends_on:
       user-db:
