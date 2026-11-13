@@ -28,6 +28,7 @@ spring:
 services:
   ms-user:
     url: ${MS_USERS_URL:http://localhost:8081/api/v1/users}
+    token: ${INTERNAL_SERVICE_TOKEN}
   mockapi:
     url: ${MOCKAPI_URL:https://6af23d8f42c6561ced39234e.mockapi.io/api/v1/transactions/users}
   brasilapi:

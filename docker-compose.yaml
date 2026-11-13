@@ -34,6 +34,7 @@ services:
       - MS_USERS_DB_USER=${MS_USERS_DB_USER:-user_admin}
       - MS_USERS_DB_PASS=${MS_USERS_DB_PASS:-123456}
       - SERVER_PORT=8081
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
     depends_on:
       user-db:
         condition: service_healthy
@@ -78,6 +79,7 @@ services:
       - MOCKAPI_URL=${MOCKAPI_URL:-https://6af23d8f42c6561ced39234e.mockapi.io/api/v1/transactions/users}
       - BRASILAPI_URL=${BRASILAPI_URL:-https://brasilapi.com.br/api/cambio/v1}
       - SERVER_PORT=8082
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
     depends_on:
       transaction-db:
         condition: service_healthy

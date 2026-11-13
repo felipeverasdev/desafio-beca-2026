@@ -15,6 +15,7 @@ spring:
 services:
   ms-user:
     url: http://localhost:8081/api/v1/users
+    token: test-service-token-secret-123456
   mockapi:
     url: https://6af23d8f42c6561ced39234e.mockapi.io/api/v1/transactions/users
   brasilapi:

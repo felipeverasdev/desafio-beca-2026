@@ -18,11 +18,14 @@ public class MsUserValidationAdapter implements UserValidationPort {
 
     private final RestClient restClient;
     private final String msUsersUrl;
+    private final String serviceToken;
 
     public MsUserValidationAdapter(
             RestClient.Builder restClientBuilder,
-            @Value("${services.ms-user.url:http://localhost:8081/api/v1/users}") String msUsersUrl) {
+            @Value("${services.ms-user.url:http://localhost:8081/api/v1/users}") String msUsersUrl,
+            @Value("${services.ms-user.token}") String serviceToken) {
         this.msUsersUrl = msUsersUrl;
+        this.serviceToken = serviceToken;
         this.restClient = restClientBuilder.build();
     }
 
@@ -35,6 +38,7 @@ public class MsUserValidationAdapter implements UserValidationPort {
         try {
             return restClient.get()
                     .uri(msUsersUrl + "/{id}/exists", userId)
+                    .header("X-Service-Token", serviceToken)
                     .retrieve()
                     .onStatus(status -> status.value() == 404, (req, resp) -> {
                         log.debug("ms-user retornou 404 para userId {}", userId);
