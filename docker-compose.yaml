@@ -1,0 +1,101 @@
+services:
+  # Banco de Dados do MS1 (ms-user)
+  user-db:
+    image: postgres:16-alpine
+    container_name: ms-user-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${MS_USERS_DB_NAME}
+      POSTGRES_USER: ${MS_USERS_DB_USER}
+      POSTGRES_PASSWORD: ${MS_USERS_DB_PASS}
+    ports:
+      - "${MS_USERS_DB_PORT}:5432"
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+    networks:
+      - beca-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${MS_USERS_DB_USER} -d ${MS_USERS_DB_NAME}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Microsserviço 1: Gestão de Usuários
+  ms-user:
+    build:
+      context: ./ms-user
+      dockerfile: Dockerfile
+    container_name: ms-user
+    restart: always
+    ports:
+      - "${MS_USERS_PORT}:8081"
+    environment:
+      - MS_USERS_DB_URL=jdbc:postgresql://user-db:5432/${MS_USERS_DB_NAME}
+      - MS_USERS_DB_USER=${MS_USERS_DB_USER}
+      - MS_USERS_DB_PASS=${MS_USERS_DB_PASS}
+      - SERVER_PORT=${MS_USERS_PORT}
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
+    depends_on:
+      user-db:
+        condition: service_healthy
+    networks:
+      - beca-network
+
+  # Banco de Dados do MS2 (ms-transaction)
+  transaction-db:
+    image: postgres:16-alpine
+    container_name: ms-transaction-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${MS_TRANSACTIONS_DB_NAME}
+      POSTGRES_USER: ${MS_TRANSACTIONS_DB_USER}
+      POSTGRES_PASSWORD: ${MS_TRANSACTIONS_DB_PASS}
+    ports:
+      - "${MS_TRANSACTIONS_DB_PORT}:5432"
+    volumes:
+      - transaction_db_data:/var/lib/postgresql/data
+    networks:
+      - beca-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${MS_TRANSACTIONS_DB_USER} -d ${MS_TRANSACTIONS_DB_NAME}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Microsserviço 2: Gestão Financeira e Transações
+  ms-transaction:
+    build:
+      context: ./ms-transaction
+      dockerfile: Dockerfile
+    container_name: ms-transaction
+    restart: always
+    ports:
+      - "${MS_TRANSACTIONS_PORT}:8082"
+    environment:
+      - MS_TRANSACTIONS_DB_URL=jdbc:postgresql://transaction-db:5432/${MS_TRANSACTIONS_DB_NAME}
+      - MS_TRANSACTIONS_DB_USER=${MS_TRANSACTIONS_DB_USER}
+      - MS_TRANSACTIONS_DB_PASS=${MS_TRANSACTIONS_DB_PASS}
+      - MS_USERS_URL=${MS_USERS_URL}
+      - MOCKAPI_URL=${MOCKAPI_URL}
+      - BRASILAPI_URL=${BRASILAPI_URL}
+      - SERVER_PORT=${MS_TRANSACTIONS_PORT}
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
+    depends_on:
+      transaction-db:
+        condition: service_healthy
+      ms-user:
+        condition: service_started
+    networks:
+      - beca-network
+
+# Volumes persistentes para não perder dados ao reiniciar containers
+volumes:
+  user_db_data:
+    driver: local
+  transaction_db_data:
+    driver: local
+
+# Rede compartilhada para comunicação interna entre microsserviços e bancos
+networks:
+  beca-network:
+    driver: bridge
