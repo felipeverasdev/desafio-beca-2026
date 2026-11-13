@@ -1,6 +1,7 @@
 package com.beca.ms_user.infrastructure.adapters.in.rest;
 
 import com.beca.ms_user.application.ports.in.*;
+import com.beca.ms_user.domain.exceptions.InvalidCredentialsException;
 import com.beca.ms_user.domain.models.User;
 import com.beca.ms_user.infrastructure.adapters.in.rest.dto.*;
 import com.beca.ms_user.infrastructure.adapters.out.security.UserSecurityDetails;
@@ -10,6 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -36,19 +38,22 @@ public class UserController {
     private final DeleteUserUseCase deleteUserUseCase;
     private final AuthenticateUserUseCase authenticateUserUseCase;
     private final ImportUsersCsvUseCase importUsersCsvUseCase;
+    private final String internalServiceToken;
 
     public UserController(CreateUserUseCase createUserUseCase,
                           FindUserUseCase findUserUseCase,
                           UpdateUserUseCase updateUserUseCase,
                           DeleteUserUseCase deleteUserUseCase,
                           AuthenticateUserUseCase authenticateUserUseCase,
-                          ImportUsersCsvUseCase importUsersCsvUseCase) {
+                          ImportUsersCsvUseCase importUsersCsvUseCase,
+                          @Value("${services.internal.token}") String internalServiceToken) {
         this.createUserUseCase = createUserUseCase;
         this.findUserUseCase = findUserUseCase;
         this.updateUserUseCase = updateUserUseCase;
         this.deleteUserUseCase = deleteUserUseCase;
         this.authenticateUserUseCase = authenticateUserUseCase;
         this.importUsersCsvUseCase = importUsersCsvUseCase;
+        this.internalServiceToken = internalServiceToken;
     }
 
     @Operation(summary = "Criar um novo usuário",
@@ -125,20 +130,6 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "Listar todos os usuários cadastrados (size = 10 por padrão)")
-    @GetMapping
-    public ResponseEntity<Page<UserSummaryDTO>> findAll(@ParameterObject @PageableDefault(size = 10) Pageable pageable) {
-        Page<User> usersDomain = findUserUseCase.findAll(pageable);
-
-        Page<UserSummaryDTO> response = usersDomain.map(user -> new UserSummaryDTO(
-                        user.getId(),
-                        user.getName(),
-                        user.getEmail()
-                ));
-
-        return ResponseEntity.ok(response);
-    }
-
     @Operation(summary = "Buscar usuário por identificador (ID)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário encontrado"),
@@ -166,13 +157,22 @@ public class UserController {
     }
 
     @Operation(summary = "Verificar existência de usuário ativo (Inter-serviços)",
-            description = "Endpoint para validação inter-serviços. Retorna 200 se o usuário existe e está ativo, ou 404 se não encontrado ou inativo. Não expõe dados sensíveis.")
+            description = "Endpoint para validação síncrona inter-serviços. Requer credencial de serviço no cabeçalho X-Service-Token. " +
+                    "Retorna 200 se o usuário existe e está ativo, 404 se não localizado ou inativo, ou 401 se a credencial for inválida ou ausente.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário existe e está ativo"),
+            @ApiResponse(responseCode = "401", description = "Credencial de serviço ausente ou inválida"),
             @ApiResponse(responseCode = "404", description = "Usuário não localizado ou inativo")
     })
     @GetMapping("/{id}/exists")
-    public ResponseEntity<Void> checkExists(@PathVariable UUID id) {
+    public ResponseEntity<Void> checkExists(
+            @PathVariable UUID id,
+            @RequestHeader(value = "X-Service-Token", required = false) String serviceToken) {
+        if (internalServiceToken == null || internalServiceToken.isBlank()
+                || serviceToken == null || serviceToken.isBlank()
+                || !internalServiceToken.equals(serviceToken.trim())) {
+            throw new InvalidCredentialsException("Credencial de serviço inválida ou ausente no cabeçalho X-Service-Token");
+        }
         findUserUseCase.findById(id);
         return ResponseEntity.ok().build();
     }
@@ -205,7 +205,8 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "Atualizar dados de um usuário existente")
+    @Operation(summary = "Atualizar dados de um usuário existente",
+            description = "Permite a atualização de nome e celular do próprio usuário autenticado. O e-mail é imutável e não pode ser alterado por este endpoint.")
     @PutMapping("/{id}")
     public ResponseEntity<UserResponseDTO> update(@PathVariable UUID id,
                                                   @RequestBody @Valid UserUpdateDTO dto,
@@ -213,7 +214,7 @@ public class UserController {
         validateOwnership(authenticatedUser, id);
 
         UpdateUserCommand updated = new UpdateUserCommand(
-                dto.name().trim(), dto.email().trim().toLowerCase(), dto.phone().trim()
+                dto.name().trim(), dto.phone().trim()
         );
         User saved = updateUserUseCase.update(id, updated);
 
@@ -240,29 +241,6 @@ public class UserController {
 
         deleteUserUseCase.delete(id);
         return ResponseEntity.noContent().build();
-    }
-
-    @Operation(summary = "Listar usuários excluídos do sistema",
-            description = "Retorna todos os usuários desativados (soft-deleted). Requer autenticação HTTP Basic.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Lista de usuários deletados retornada com sucesso")
-    })
-    @GetMapping("/deleted")
-    public ResponseEntity<Page<UserResponseDTO>> findDeleted(
-            @ParameterObject @PageableDefault(size = 10) Pageable pageable) {
-        Page<User> deletedUsers = findUserUseCase.findAllDeleted(pageable);
-        Page<UserResponseDTO> response = deletedUsers.map(user -> new UserResponseDTO(
-                user.getId(),
-                user.getName(),
-                user.getEmail(),
-                user.getCpf(),
-                user.getPhone(),
-                user.getCreatedAt(),
-                user.getUpdatedAt(),
-                user.getDeletedAt()
-        ));
-
-        return ResponseEntity.ok(response);
     }
 
     private void validateOwnership(UserSecurityDetails authenticatedUser, UUID targetId) {

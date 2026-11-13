@@ -31,17 +31,17 @@ class UserTest {
     }
 
     @Test
-    @DisplayName("Deve atualizar dados pessoais e registrar nova data em updatedAt")
+    @DisplayName("Deve atualizar dados pessoais (nome e celular) mantendo o e-mail original e registrando nova data em updatedAt")
     void shouldUpdatePersonalData() {
         UUID id = UUID.randomUUID();
         OffsetDateTime created = OffsetDateTime.now().minusHours(1);
         User user = new User(id, "Lucas Silva", "lucas@email.com", "$2a$10$encodedPasswordHash",
                 "12345678901", "5511987654321", created, created, null);
 
-        user.updatePersonalData("Lucas S. Atualizado", "lucas.atualizado@email.com", "5511999998888");
+        user.updatePersonalData("Lucas S. Atualizado", "5511999998888");
 
         assertEquals("Lucas S. Atualizado", user.getName());
-        assertEquals("lucas.atualizado@email.com", user.getEmail());
+        assertEquals("lucas@email.com", user.getEmail());
         assertEquals("5511999998888", user.getPhone());
         assertTrue(user.getUpdatedAt().isAfter(created));
     }

@@ -45,9 +45,8 @@ public class User {
         );
     }
 
-    public void updatePersonalData(String newName, String newEmail, String newPhone) {
+    public void updatePersonalData(String newName, String newPhone) {
         this.name = newName;
-        this.email = newEmail;
         this.phone = newPhone;
         this.updatedAt = OffsetDateTime.now();
     }

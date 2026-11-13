@@ -12,6 +12,7 @@ import java.util.UUID;
 public interface SpringDataUserRepository extends JpaRepository<UserJpaEntity, UUID> {
     Optional<UserJpaEntity> findByEmailAndDeletedAtIsNull(String email);
     Optional<UserJpaEntity> findByCpfAndDeletedAtIsNull(String cpf);
+    Optional<UserJpaEntity> findByPhoneAndDeletedAtIsNull(String phone);
     Optional<UserJpaEntity> findByIdAndDeletedAtIsNull(UUID id);
     Page<UserJpaEntity> findAllByDeletedAtIsNull(Pageable pageable);
     Page<UserJpaEntity> findAllByDeletedAtIsNotNull(Pageable pageable);

@@ -44,6 +44,11 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
     }
 
     @Override
+    public Optional<User> findByPhone(String phone) {
+        return repository.findByPhoneAndDeletedAtIsNull(phone).map(this::toDomain);
+    }
+
+    @Override
     public Page<User> findAll(Pageable pageable) {
         return repository.findAllByDeletedAtIsNull(pageable).map(this::toDomain);
     }

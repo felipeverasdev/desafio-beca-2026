@@ -36,6 +36,9 @@ class UserControllerSecurityTest {
     @Autowired
     private CreateUserUseCase createUserUseCase;
 
+    @Autowired
+    private com.beca.ms_user.application.ports.in.DeleteUserUseCase deleteUserUseCase;
+
     private User userA;
     private User userB;
 
@@ -66,19 +69,20 @@ class UserControllerSecurityTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/deleted deve retornar 401 Unauthorized sem credenciais")
-    void shouldReturn401OnDeletedWithoutAuth() throws Exception {
-        mockMvc.perform(get("/api/v1/users/deleted"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.status").value(401));
+    @DisplayName("GET /api/v1/users/deleted deve retornar 400 Bad Request pois o endpoint foi desativado e o parâmetro não é um UUID válido")
+    void shouldReturn400WhenAccessingDeletedEndpoint() throws Exception {
+        mockMvc.perform(get("/api/v1/users/deleted")
+                        .with(httpBasic("usera@email.com", "senha123")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/deleted deve retornar 200 OK quando autenticado")
-    void shouldReturn200OnDeletedWithAuth() throws Exception {
-        mockMvc.perform(get("/api/v1/users/deleted")
+    @DisplayName("GET /api/v1/users deve retornar 405 Method Not Allowed pois a listagem de usuários foi removida")
+    void shouldReturn405WhenAccessingUsersListEndpoint() throws Exception {
+        mockMvc.perform(get("/api/v1/users")
                         .with(httpBasic("usera@email.com", "senha123")))
-                .andExpect(status().isOk());
+                .andExpect(status().isMethodNotAllowed());
     }
 
     @Test
@@ -99,13 +103,14 @@ class UserControllerSecurityTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/{id} deve retornar 200 OK quando usuário autenticado consultar a si mesmo")
+    @DisplayName("GET /api/v1/users/{id} deve retornar 200 OK com CPF mascarado quando usuário autenticado consultar a si mesmo")
     void shouldReturn200WhenUserConsultsSelfById() throws Exception {
         mockMvc.perform(get("/api/v1/users/{id}", userA.getId())
                         .with(httpBasic("usera@email.com", "senha123")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(userA.getId().toString()))
-                .andExpect(jsonPath("$.email").value("usera@email.com"));
+                .andExpect(jsonPath("$.email").value("usera@email.com"))
+                .andExpect(jsonPath("$.cpf").value("***.456.789-**"));
     }
 
     @Test
@@ -139,12 +144,32 @@ class UserControllerSecurityTest {
     }
 
     @Test
+    @DisplayName("PUT /api/v1/users/{id} deve retornar 200 OK quando usuário atualizar seu próprio perfil")
+    void shouldReturn200WhenUserUpdatesSelf() throws Exception {
+        String updatePayload = """
+                {
+                    "name": "User A Atualizado",
+                    "phone": "5511988887777"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/users/{id}", userA.getId())
+                        .with(httpBasic("usera@email.com", "senha123"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userA.getId().toString()))
+                .andExpect(jsonPath("$.name").value("User A Atualizado"))
+                .andExpect(jsonPath("$.email").value("usera@email.com"))
+                .andExpect(jsonPath("$.phone").value("5511988887777"));
+    }
+
+    @Test
     @DisplayName("PUT /api/v1/users/{id} deve retornar 403 Forbidden quando usuário tentar alterar dados de outro")
     void shouldReturn403WhenUserUpdatesAnother() throws Exception {
         String updatePayload = """
                 {
                     "name": "Nome Alterado",
-                    "email": "usera@email.com",
                     "phone": "5511987654321"
                 }
                 """;
@@ -167,10 +192,45 @@ class UserControllerSecurityTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/{id}/exists deve ser público (200 para usuário ativo)")
-    void shouldReturn200OnExistsWithoutAuth() throws Exception {
+    @DisplayName("GET /api/v1/users/{id}/exists deve retornar 401 Unauthorized quando chamado sem o token de serviço")
+    void shouldReturn401OnExistsWithoutServiceToken() throws Exception {
         mockMvc.perform(get("/api/v1/users/{id}/exists", userA.getId()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/{id}/exists deve retornar 401 Unauthorized com token de serviço vazio")
+    void shouldReturn401OnExistsWithEmptyServiceToken() throws Exception {
+        mockMvc.perform(get("/api/v1/users/{id}/exists", userA.getId())
+                        .header("X-Service-Token", ""))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/{id}/exists deve retornar 401 Unauthorized com token de serviço inválido")
+    void shouldReturn401OnExistsWithInvalidServiceToken() throws Exception {
+        mockMvc.perform(get("/api/v1/users/{id}/exists", userA.getId())
+                        .header("X-Service-Token", "token-invalido"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/{id}/exists deve retornar 200 OK com token de serviço válido para usuário ativo")
+    void shouldReturn200OnExistsWithValidServiceToken() throws Exception {
+        mockMvc.perform(get("/api/v1/users/{id}/exists", userA.getId())
+                        .header("X-Service-Token", "test-service-token-secret-123456"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/{id}/exists deve retornar 404 Not Found com token válido para usuário inexistente")
+    void shouldReturn404OnExistsWithValidServiceTokenWhenUserNotFound() throws Exception {
+        mockMvc.perform(get("/api/v1/users/{id}/exists", UUID.randomUUID())
+                        .header("X-Service-Token", "test-service-token-secret-123456"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -193,5 +253,26 @@ class UserControllerSecurityTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.errors[0].fieldName").value("name"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/users deve retornar 409 Conflict quando telefone já estiver cadastrado")
+    void shouldReturn409WhenPhoneAlreadyExists() throws Exception {
+        String payload = """
+                {
+                    "name": "Novo Usuario",
+                    "email": "novousuario@email.com",
+                    "password": "senhaForte123",
+                    "cpf": "99988877766",
+                    "phone": "5511987654321"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message").value("Telefone já cadastrado no sistema."));
     }
 }

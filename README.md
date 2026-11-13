@@ -64,16 +64,18 @@ Com os containers em execução, acesse as interfaces interativas no navegador:
 
 ## Segurança e Autenticação
 
-- **Mecanismo:** HTTP Basic Authentication (`Authorization: Basic base64(email:senha)`).
+- **Mecanismo:** HTTP Basic Authentication (`Authorization: Basic base64(email:senha)`) para clientes/usuários e Token de Serviço (`X-Service-Token`) para comunicação inter-serviços.
 - **Rotas Públicas:**
   - Cadastro de usuários: `POST /api/v1/users`
   - Validação de credenciais: `POST /api/v1/users/auth`
-  - Verificação de existência inter-serviços: `GET /api/v1/users/{id}/exists` (sem dados sensíveis)
   - Documentação OpenAPI/Swagger: `/swagger-ui/**`, `/v3/api-docs/**`
-- **Rotas Protegidas:**
+- **Rota Inter-Serviços (Token de Serviço):**
+  - Verificação de existência: `GET /api/v1/users/{id}/exists` (exige cabeçalho `X-Service-Token` com a credencial compartilhada do sistema).
+- **Rotas Protegidas (HTTP Basic):**
   - Todas as demais rotas exigem credenciais válidas cadastradas no banco de dados.
   - Usuários que sofreram exclusão lógica (_soft delete_) têm acesso revogado imediatamente.
   - **Validação de Propriedade (_Ownership Check_):** Nas operações de consulta por ID (`GET /api/v1/users/{id}`), consulta por e-mail (`GET /api/v1/users/by-email`), atualização (`PUT /api/v1/users/{id}`) e remoção (`DELETE /api/v1/users/{id}`), o sistema confere se o usuário autenticado é o titular do identificador ou do e-mail informado. Tentativas de consultar, alterar ou excluir perfis de terceiros retornam `403 Forbidden`.
+  - **Privacidade e LGPD:** A rota de listagem geral de todos os usuários (`GET /api/v1/users`) foi deliberadamente removida para assegurar o Princípio do Menor Privilégio e a não-exposição de dados cadastrais de clientes do banco a outros usuários.
 
 ---
 
@@ -81,18 +83,28 @@ Com os containers em execução, acesse as interfaces interativas no navegador:
 
 ### Microsserviço 1: `ms-user` (Porta 8081)
 
-| Método   | Rota                       | Autenticação       | Descrição                                                              |
-| :------- | :------------------------- | :----------------- | :--------------------------------------------------------------------- |
-| `POST`   | `/api/v1/users`            | Pública            | Cadastra um novo usuário no sistema.                                   |
-| `POST`   | `/api/v1/users/auth`       | Pública            | Valida credenciais (e-mail e senha) e retorna dados do usuário.        |
-| `GET`    | `/api/v1/users/{id}/exists`| Pública            | Validação rápida de existência de usuário (sem dados sensíveis).      |
-| `POST`   | `/api/v1/users/upload-csv` | Autenticada        | Importação em massa de usuários via upload de arquivo CSV.             |
-| `GET`    | `/api/v1/users`            | Autenticada        | Listagem paginada de usuários ativos (`page`, `size`, `sort`).         |
-| `GET`    | `/api/v1/users/deleted`    | Autenticada        | Listagem paginada de usuários excluídos logicamente com `deletedAt`.   |
-| `GET`    | `/api/v1/users/{id}`       | Autenticada (Dono) | Busca os dados cadastrais do próprio usuário por UUID.                 |
-| `GET`    | `/api/v1/users/by-email`   | Autenticada (Dono) | Busca o próprio perfil do usuário pelo e-mail (case-insensitive).      |
-| `PUT`    | `/api/v1/users/{id}`       | Autenticada (Dono) | Atualiza nome, e-mail e celular do próprio usuário logado.             |
-| `DELETE` | `/api/v1/users/{id}`       | Autenticada (Dono) | Realiza exclusão lógica (_soft delete_) do próprio usuário logado.    |
+| Método   | Rota                        | Autenticação               | Descrição                                                              |
+| :------- | :-------------------------- | :------------------------- | :--------------------------------------------------------------------- |
+| `POST`   | `/api/v1/users`             | Pública                    | Cadastra um novo usuário no sistema.                                   |
+| `POST`   | `/api/v1/users/auth`        | Pública                    | Valida credenciais (e-mail e senha) e retorna dados do usuário.        |
+| `GET`    | `/api/v1/users/{id}/exists` | Token (`X-Service-Token`)  | Validação inter-serviços de existência/status ativo (retorno `Void`).  |
+| `POST`   | `/api/v1/users/upload-csv`  | Autenticada                | Importação em massa de usuários via upload de arquivo CSV.             |
+| `GET`    | `/api/v1/users/{id}`        | Autenticada (Dono)         | Busca os dados cadastrais do próprio usuário por UUID (CPF mascarado). |
+| `GET`    | `/api/v1/users/by-email`    | Autenticada (Dono)         | Busca o próprio perfil do usuário pelo e-mail (case-insensitive).      |
+| `PUT`    | `/api/v1/users/{id}`        | Autenticada (Dono)         | Atualiza nome e celular do próprio usuário logado (e-mail é imutável). |
+| `DELETE` | `/api/v1/users/{id}`        | Autenticada (Dono)         | Realiza exclusão lógica (_soft delete_) do próprio usuário logado.    |
+
+---
+
+### Proteção e Análise de Risco da Rota Inter-Serviços (`GET /api/v1/users/{id}/exists`)
+
+- **Propósito:** Comunicação síncrona de alta performance entre microsserviços (`ms-transaction` consultando `ms-user`) para validar se o titular da conta existe e está ativo antes de aprovar movimentações financeiras.
+- **Mecanismo de Proteção Implementado:** A rota exige obrigatoriamente o envio do cabeçalho `X-Service-Token` contendo a credencial de serviço compartilhada (`INTERNAL_SERVICE_TOKEN`). Qualquer requisição anônima ou com token incorreto recebe `401 Unauthorized` de forma opaca, eliminando a possibilidade de atacantes externos deduzirem quais UUIDs existem no banco via enumeração (`200 OK` vs `404 Not Found`).
+- **Mitigações em Profundidade (Defense in Depth):**
+  1. **Autenticação por Token de Serviço:** Apenas serviços internos autorizados conseguem obter status `200` ou `404`.
+  2. **Ausência de Dados Pessoais (Zero PII):** Mesmo internamente, a resposta é vazia (`ResponseEntity<Void>` com `Content-Length: 0`), nunca expondo nome, CPF, e-mail, telefone ou saldos.
+  3. **Alta Entropia do UUID v4:** O sistema adota exclusivamente UUID versão 4 (122 bits aleatórios, espaço amostral de $5{,}3 \times 10^{36}$). Ataques de força bruta são inviáveis.
+  4. **Ambiente Produtivo Corporativo:** Em nuvem, a comunicação trafega na sub-rede privada (VPC interna) sem exposição ao Ingress/API Gateway público.
 
 #### Exemplo de Payload para Cadastro (`POST /api/v1/users`):
 
