@@ -1,0 +1,28 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  datasource:
+    url: ${MS_USERS_DB_URL:jdbc:postgresql://localhost:5434/user_db}
+    username: ${MS_USERS_DB_USER:user_admin}
+    password: ${MS_USERS_DB_PASS}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  application:
+    name: ms-user
+
+services:
+  internal:
+    token: ${INTERNAL_SERVICE_TOKEN}
+

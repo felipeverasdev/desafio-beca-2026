@@ -1,0 +1,97 @@
+package com.beca.ms_user.domain.models;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class UserTest {
+
+    @Test
+    @DisplayName("Deve preparar criação de usuário sem ID prévio antes da persistência")
+    void shouldCreateUserSuccessfully() {
+        User user = User.create(
+                "Lucas Silva",
+                "lucas@email.com",
+                "$2a$10$encodedPasswordHash",
+                "12345678901",
+                "5511987654321"
+        );
+
+        assertNull(user.getId());
+        assertEquals("Lucas Silva", user.getName());
+        assertEquals("lucas@email.com", user.getEmail());
+        assertEquals("$2a$10$encodedPasswordHash", user.getPassword());
+        assertEquals("12345678901", user.getCpf());
+        assertEquals("5511987654321", user.getPhone());
+        assertNull(user.getDeletedAt());
+    }
+
+    @Test
+    @DisplayName("Deve atualizar dados pessoais (nome e celular) mantendo o e-mail original e registrando nova data em updatedAt")
+    void shouldUpdatePersonalData() {
+        UUID id = UUID.randomUUID();
+        OffsetDateTime created = OffsetDateTime.now().minusHours(1);
+        User user = new User(id, "Lucas Silva", "lucas@email.com", "$2a$10$encodedPasswordHash",
+                "12345678901", "5511987654321", created, created, null);
+
+        user.updatePersonalData("Lucas S. Atualizado", "5511999998888");
+
+        assertEquals("Lucas S. Atualizado", user.getName());
+        assertEquals("lucas@email.com", user.getEmail());
+        assertEquals("5511999998888", user.getPhone());
+        assertTrue(user.getUpdatedAt().isAfter(created));
+    }
+
+    @Test
+    @DisplayName("Deve realizar soft delete registrando a data em deletedAt")
+    void shouldSoftDeleteUser() {
+        User user = User.create(
+                "Lucas Silva",
+                "lucas@email.com",
+                "$2a$10$encodedPasswordHash",
+                "12345678901",
+                "5511987654321"
+        );
+
+        assertNull(user.getDeletedAt());
+
+        user.delete();
+
+        assertNotNull(user.getDeletedAt());
+        assertNotNull(user.getUpdatedAt());
+    }
+
+    @Test
+    @DisplayName("Deve instanciar corretamente através do construtor completo")
+    void shouldInstantiateWithAllArgsConstructor() {
+        UUID id = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.now();
+
+        User user = new User(
+                id,
+                "Maria Souza",
+                "maria@email.com",
+                "secretHash",
+                "98765432100",
+                "5511911112222",
+                now,
+                now,
+                null
+        );
+
+        assertEquals(id, user.getId());
+        assertEquals("Maria Souza", user.getName());
+        assertEquals("maria@email.com", user.getEmail());
+        assertEquals("secretHash", user.getPassword());
+        assertEquals("98765432100", user.getCpf());
+        assertEquals("5511911112222", user.getPhone());
+        assertEquals(now, user.getCreatedAt());
+        assertEquals(now, user.getUpdatedAt());
+        assertNull(user.getDeletedAt());
+    }
+}
+
